@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}403 · Acceso restringido{% endblock %}
+{% block content %}
+<section class="card" style="max-inline-size:540px;margin:24px auto;border-inline-start:4px solid var(--bad-accent)">
+  <span class="page-kicker">Control de Acceso · Operación Restringida</span>
+  <h1 style="margin-block:4px 8px">403 · Sin permiso para esta operación</h1>
+  <p class="muted" style="margin-block-end:16px">
+    Tu perfil actual (<strong>{{ user.rol_nombre|default:"No autorizado" }}</strong>) no cuenta con privilegios para acceder a este módulo del sistema SCADA.
+  </p>
+  <a class="btn" href="{% url 'home' %}">Volver a mi estación de inicio</a>
+</section>
+{% endblock %}

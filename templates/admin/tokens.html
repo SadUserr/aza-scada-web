@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Tokens de captura API{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-meta">
+    <span class="page-kicker">Integración de Planta · Estaciones de Visión Artificial</span>
+    <h1>Tokens de captura</h1>
+    <div class="muted">Credenciales de conexión segura para nodos ópticos en línea de trefilado. El valor secreto se almacena cifrado y solo se muestra al momento de su emisión.</div>
+  </div>
+</div>
+
+{% if nuevo %}
+<div class="msg warning" role="status">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div>
+      <strong>Token generado (se muestra una sola vez; cópialo ahora):</strong><br>
+      <code id="nuevo-token" style="user-select:all;font-weight:800;font-size:.9rem">{{ nuevo }}</code>
+    </div>
+    <button type="button" class="btn sec sm" id="copy-token-btn">Copiar token</button>
+  </div>
+</div>
+{% endif %}
+
+<div class="grid g-split">
+  <section class="card">
+    <div class="card-header">
+      <h2>Credenciales emitidas</h2>
+      <span class="telemetry-chip">Credenciales de Estación</span>
+    </div>
+    <div class="table-wrapper" tabindex="0" role="region" aria-label="Tabla de tokens de captura API">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Estación / Cliente óptico</th>
+            <th scope="col">Fecha emisión</th>
+            <th scope="col">Emitido por</th>
+            <th scope="col">Estado</th>
+            <th scope="col">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tokens %}
+          <tr>
+            <td><strong>{{ t.nombre }}</strong></td>
+            <td class="mono">{{ t.fecha_creacion|date:"d/m/Y H:i" }}</td>
+            <td class="mono">{{ t.creado_por }}</td>
+            <td>
+              <span class="tag {% if t.activo %}ok{% else %}bad{% endif %}">
+                {% if t.activo %}✓ Activo{% else %}✕ Revocado{% endif %}
+              </span>
+            </td>
+            <td>
+              {% if t.activo %}
+                <form class="sec-form" method="post" action="{% url 'adm_token_revocar' t.pk %}">
+                  {% csrf_token %}
+                  <button class="link" type="submit">Revocar</button>
+                </form>
+              {% else %}
+                <span class="muted">Inhabilitado</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="muted">Sin tokens registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <form method="post" class="card" style="align-self:start">
+    {% csrf_token %}
+    <input type="hidden" name="accion" value="crear">
+    <div class="card-header">
+      <h2>Emitir nuevo token</h2>
+    </div>
+
+    <label for="{{ form.nombre.id_for_label }}">{{ form.nombre.label }}</label>
+    {{ form.nombre }}
+    {{ form.nombre.errors }}
+
+    <p class="muted mt-sm">Usa un token independiente por cada cámara o nodo Jetson para poder revocar credenciales individuales sin detener otras líneas.</p>
+    <button class="btn mt-md" type="submit" style="inline-size:100%">Generar token</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+(function(){
+  const btn = document.getElementById('copy-token-btn');
+  const code = document.getElementById('nuevo-token');
+  if (btn && code && navigator.clipboard) {
+    btn.addEventListener('click', function() {
+      navigator.clipboard.writeText(code.textContent.trim());
+      btn.textContent = '✓ Token copiado';
+    });
+  }
+})();
+</script>
+{% endblock %}

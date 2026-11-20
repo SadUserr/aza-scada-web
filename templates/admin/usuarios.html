@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Gestión de usuarios{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-meta">
+    <span class="page-kicker">Administración de Planta · Control de Accesos</span>
+    <h1>Gestión de usuarios</h1>
+    <div class="muted">Administración de operadores, supervisores y claves temporales con cambio obligatorio</div>
+  </div>
+  <div class="page-actions">
+    <span class="telemetry-chip">Cuentas registradas: {{ usuarios|length }}</span>
+    <a class="btn sec sm" href="{% url 'adm_panel' %}">Ver Panel Ejecutivo y Auditoría →</a>
+  </div>
+</div>
+
+{% if resumen %}
+<section class="grid g4" aria-label="Resumen operacional para Administración">
+  <article class="kpi-tile">
+    <span class="kpi-lbl">Producción hoy</span>
+    <div class="kpi">{{ resumen.insp_hoy }}</div>
+    <div class="kpi-sub">Conformidad hoy: {{ resumen.tasa_hoy }}%</div>
+  </article>
+  <article class="kpi-tile">
+    <span class="kpi-lbl">Lotes / Recetas activas</span>
+    <div class="kpi">{{ resumen.lotes_abiertos }} / {{ resumen.recetas_activas }}</div>
+    <div class="kpi-sub">{{ resumen.tokens_activos }} estaciones API activas</div>
+  </article>
+  <article class="kpi-tile">
+    <span class="kpi-lbl">Alarmas críticas (7d)</span>
+    <div class="kpi" style="color:{% if resumen.alarmas_criticas %}var(--bad-ink){% else %}var(--ok-ink){% endif %}">{{ resumen.alarmas_criticas }}</div>
+    <div class="kpi-sub">Cuentas bloqueadas: {{ resumen.cuentas_bloqueadas }}</div>
+  </article>
+  <article class="kpi-tile">
+    <span class="kpi-lbl">Acciones auditadas hoy</span>
+    <div class="kpi">{{ resumen.acciones_hoy }}</div>
+    <div class="kpi-sub"><a href="{% url 'adm_panel' %}">Revisar bitácora completa →</a></div>
+  </article>
+</section>
+{% endif %}
+
+{% if solicitudes %}
+<section class="card" style="border-inline-start:4px solid var(--warn-accent);background:var(--warn-bg)">
+  <div class="card-header" style="border-color:var(--warn-border)">
+    <span class="card-title" style="color:var(--warn-ink)">⚠ Solicitudes de recuperación de contraseña pendientes</span>
+    <span class="tag warn">{{ solicitudes|length }} pendiente{{ solicitudes|length|pluralize }}</span>
+  </div>
+  <div class="table-wrapper" tabindex="0" role="region" aria-label="Solicitudes de recuperación pendientes">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Fecha solicitud</th>
+          <th scope="col">Cuenta solicitante</th>
+          <th scope="col">Acción administrativa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in solicitudes %}
+        <tr>
+          <td class="mono">{{ a.fecha|date:"d/m/Y H:i" }}</td>
+          <td><strong>{{ a.usuario.username }}</strong> · {{ a.usuario.nombre_completo }}</td>
+          <td>
+            <form class="sec-form" method="post" action="{% url 'adm_usuario_accion' a.usuario_id %}">
+              {% csrf_token %}
+              <button class="btn sm" type="submit" name="accion" value="reset">Asignar contraseña temporal</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{% if temporal %}
+<div class="msg warning" role="status">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <span>Contraseña temporal emitida (se muestra una sola vez): <code id="tmp-pwd" style="font-weight:800;user-select:all">{{ temporal }}</code></span>
+    <button type="button" class="btn sec sm" data-copy-target="tmp-pwd">Copiar clave</button>
+  </div>
+</div>
+{% endif %}
+
+<div class="grid g-split">
+  <section class="card">
+    <div class="card-header">
+      <h2>Nómina de usuarios de planta</h2>
+    </div>
+    <div class="table-wrapper" tabindex="0" role="region" aria-label="Listado de usuarios del sistema">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Usuario / Nombre</th>
+            <th scope="col">Perfil de planta</th>
+            <th scope="col">Estado</th>
+            <th scope="col">Último acceso</th>
+            <th scope="col">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in usuarios %}
+          <tr>
+            <td>
+              <strong>{{ u.username }}</strong>
+              <div class="muted">{{ u.nombre_completo }}</div>
+            </td>
+            <td>
+              <form class="sec-form" method="post" action="{% url 'adm_usuario_accion' u.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="rol">
+                <select name="rol" class="js-role-select" aria-label="Rol de {{ u.username }}" style="min-inline-size:132px;margin:0">
+                  {% for r in roles %}
+                    <option value="{{ r.pk }}" {% if r.pk == u.rol_id %}selected{% endif %}>{{ r.nombre }}</option>
+                  {% endfor %}
+                </select>
+              </form>
+            </td>
+            <td>
+              <span class="tag {% if u.is_active %}ok{% else %}bad{% endif %}">
+                {% if u.is_active %}✓ Activo{% else %}✕ Inactivo{% endif %}
+              </span>
+            </td>
+            <td class="mono">{{ u.ultimo_acceso|date:"d/m H:i"|default:"—" }}</td>
+            <td>
+              <form class="sec-form" method="post" action="{% url 'adm_usuario_accion' u.pk %}">
+                {% csrf_token %}
+                <button class="link" type="submit" name="accion" value="toggle">{% if u.is_active %}Desactivar{% else %}Activar{% endif %}</button>
+                ·
+                <button class="link" type="submit" name="accion" value="reset">Restablecer contraseña</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <form method="post" class="card" style="align-self:start">
+    {% csrf_token %}
+    <input type="hidden" name="accion" value="crear">
+    <div class="card-header">
+      <h2>Crear nuevo usuario</h2>
+    </div>
+    {{ form.non_field_errors }}
+
+    <label for="{{ form.nombre_completo.id_for_label }}">Nombre completo</label>
+    {{ form.nombre_completo }}
+    {{ form.nombre_completo.errors }}
+
+    <label for="{{ form.username.id_for_label }}">Identificador de usuario</label>
+    {{ form.username }}
+    {{ form.username.errors }}
+
+    <label for="{{ form.rol.id_for_label }}">Perfil de acceso</label>
+    {{ form.rol }}
+
+    <p class="muted mt-sm">El sistema generará automáticamente una contraseña temporal con cambio obligatorio en el primer inicio de sesión.</p>
+    <button class="btn mt-md" type="submit" style="inline-size:100%">Crear usuario</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+(function(){
+  document.querySelectorAll('.js-role-select').forEach(function(sel) {
+    sel.addEventListener('change', function() { sel.form.submit(); });
+  });
+  document.querySelectorAll('[data-copy-target]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const el = document.getElementById(btn.getAttribute('data-copy-target'));
+      if (el && navigator.clipboard) {
+        navigator.clipboard.writeText(el.textContent.trim());
+        btn.textContent = '✓ Copiada';
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

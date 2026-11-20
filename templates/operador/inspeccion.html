@@ -1,0 +1,492 @@
+{% extends "base.html" %}{% load l10n %}
+{% block title %}Inspección en vivo{% endblock %}
+{% block topbar_extra %}
+<button id="audio-btn" type="button" class="telemetry-chip" style="cursor:pointer" aria-pressed="false" title="Activar alerta acústica ante rechazo en línea">
+  🔇 Alerta sonora: OFF
+</button>
+{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-meta">
+    <span class="page-kicker">Operación de Planta · Estación de Control en Línea</span>
+    <h1>Inspección en vivo</h1>
+    <div class="muted">Monitoreo continuo del ángulo de salida del rollo en trefilado · consulta automática cada 5 s</div>
+  </div>
+  <div class="page-actions">
+    <span class="telemetry-chip ok" id="sync-pill">● Pulso activo · ciclo 5 s</span>
+    <a class="btn sec sm" href="{% url 'op_historial' %}">Historial de turno</a>
+  </div>
+</div>
+
+{% if ultima %}
+<section id="hero" class="hero-panel {% if ultima.estado_nombre == 'Aprobado' %}state-ok{% elif ultima.estado_nombre == 'Rechazado' %}state-bad{% else %}state-info{% endif %}" aria-label="Última inspección registrada">
+  <div class="hero-toolbar">
+    <div>
+      REGISTRO: <strong id="h-cod">{{ ultima.codigo }}</strong>
+      · CAPTURA: <strong id="h-hora">{{ ultima.fecha|date:"d/m H:i:s" }}</strong>
+      · TURNO: <strong id="h-turno">{{ ultima.turno.nombre|default:"—" }}</strong>
+    </div>
+    <div>ESTACIÓN ÓPTICA · GONIÓMETRO 360°</div>
+  </div>
+
+  <div class="hero-split">
+    <div class="hero-left">
+      <div>
+        <div class="hero-status-row">
+          <div id="h-estado">{% include "_estado.html" with estado=ultima.estado_nombre %}</div>
+          <div class="batch-box">
+            <span class="batch-lbl">Batch</span>
+            <span class="batch-code" id="h-batch">{{ ultima.id_batch }}</span>
+          </div>
+        </div>
+
+        <div class="mt-md">
+          <span class="meta-lbl">Ángulo medido en salida de rollo</span>
+          <div class="angle-readout-wrap">
+            <div class="big" id="h-ang">{{ ultima.angulo|floatformat:1 }}°</div>
+            <span class="angle-delta" id="h-delta">Evaluando ventana…</span>
+          </div>
+        </div>
+
+        <div class="tol-scale-box mt-md" id="tol-box">
+          <div class="tol-scale-head">
+            <span id="tol-min-lbl">MÍN: {% if ultima.limite_min != None %}{{ ultima.limite_min }}°{% else %}—{% endif %}</span>
+            <span id="tol-nom-lbl" style="font-weight:700;color:var(--ink)">VENTANA DE TOLERANCIA</span>
+            <span id="tol-max-lbl">MÁX: {% if ultima.limite_max != None %}{{ ultima.limite_max }}°{% else %}—{% endif %}</span>
+          </div>
+          <div class="tol-scale-track">
+            <div class="tol-scale-zone" id="tol-zone" style="left:25%;width:50%"></div>
+            <div class="tol-scale-marker" id="tol-marker" style="left:50%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="meta-matrix">
+          <div class="meta-cell">
+            <span class="meta-lbl">Lote en curso</span>
+            <span class="meta-val" id="h-lote">{{ ultima.lote.codigo }}</span>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-lbl">Receta aplicada</span>
+            <span class="meta-val" id="h-rec">{{ ultima.receta.nombre|default:"—" }}</span>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-lbl">Rango permitido</span>
+            <span class="meta-val" id="h-rng">{% if ultima.limite_min != None %}{{ ultima.limite_min }}° – {{ ultima.limite_max }}°{% else %}—{% endif %}</span>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-lbl">Operador inicia lote</span>
+            <span class="meta-val" id="h-op-ini">{{ ultima.lote.operador_inicio.nombre_completo|default:"Pendiente" }}</span>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-lbl">Operador en captura</span>
+            <span class="meta-val" id="h-op">{{ ultima.operador.nombre_completo|default:"—" }}</span>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-lbl">Operador termina lote</span>
+            <span class="meta-val" id="h-op-fin">{{ ultima.lote.operador_fin.nombre_completo|default:"En curso" }}</span>
+          </div>
+        </div>
+
+        <div class="hero-foot mt-md">
+          <a id="detalle-link" class="btn-tech-link" href="{% url 'detalle' ultima.pk %}">Ver detalle de la inspección y métricas →</a>
+          <span class="mono muted" style="font-size:.72rem">DISCO COMPLETO 0° – 360°</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-right">
+      <div class="gauge-head">
+        <span>Goniómetro óptico · Disco completo</span>
+        <span>ESCALA 0° – 360°</span>
+      </div>
+
+      <div class="gauge-stage">
+        <svg id="gauge-svg" role="img" aria-labelledby="gauge-title" viewBox="0 0 360 360" style="max-width:320px">
+          <title id="gauge-title">Goniómetro óptico de disco completo: lectura {{ ultima.angulo|floatformat:1 }} grados</title>
+          <circle cx="180" cy="180" r="154" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+          <circle cx="180" cy="180" r="140" fill="#f8fafc" stroke="#94a3b8" stroke-width="10"/>
+          <circle cx="180" cy="180" r="106" fill="none" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3 3"/>
+          <circle cx="180" cy="180" r="68" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+          <line x1="32" y1="180" x2="328" y2="180" stroke="#cbd5e1" stroke-dasharray="4 3" stroke-width="1"/>
+          <line x1="180" y1="32" x2="180" y2="328" stroke="#cbd5e1" stroke-dasharray="4 3" stroke-width="1"/>
+          <path id="gauge-tol-wedge" d="" fill="rgba(16, 185, 129, 0.16)"/>
+          <path id="gauge-tol-arc" d="" fill="none" stroke="#10b981" stroke-width="12"/>
+          <g id="gauge-ticks"></g>
+          <g id="gauge-limits"></g>
+          <line id="gauge-tail" x1="180" y1="180" x2="140" y2="180" stroke="#94a3b8" stroke-width="2" stroke-dasharray="3 2"/>
+          <line id="gauge-needle" x1="180" y1="180" x2="310" y2="180" stroke="#c8102e" stroke-width="3.2" stroke-linecap="round"/>
+          <circle id="gauge-tip" cx="310" cy="180" r="5" fill="#c8102e" stroke="#ffffff" stroke-width="1.5"/>
+          <circle cx="180" cy="180" r="11" fill="#14181f" stroke="#cbd5e1" stroke-width="2"/>
+          <circle cx="180" cy="180" r="4" fill="#c8102e"/>
+        </svg>
+        <div class="gauge-readout-pill" style="margin-top:4px">
+          <div style="font-size:.63rem;color:var(--muted);text-transform:uppercase">Lectura angular</div>
+          <div id="gauge-readout" style="font-size:1.1rem;font-weight:800;color:var(--ink)">{{ ultima.angulo|floatformat:2 }}°</div>
+        </div>
+      </div>
+
+      <div class="gauge-foot">
+        <span>SENSOR: VISIÓN ARTIFICIAL</span>
+        <span id="gauge-status-txt">ESTADO: {{ ultima.estado_nombre|upper }}</span>
+      </div>
+    </div>
+  </div>
+</section>
+{% else %}
+<section class="card" id="hero" style="border-inline-start:4px solid var(--info-accent)">
+  <div class="card-header">
+    <span class="card-title">Estación en espera de disparo</span>
+    <span class="tag info">◌ En espera</span>
+  </div>
+  <p class="muted">Esperando primera inspección desde el nodo de visión artificial (Jetson / simulador API). La pantalla se actualizará automáticamente al recibir el primer <code>id_batch</code>.</p>
+</section>
+{% endif %}
+
+<section class="card" aria-labelledby="lotes-linea-title">
+  <div class="card-header">
+    <h2 id="lotes-linea-title">Control de turno y operación de lotes activos</h2>
+    <span class="telemetry-chip">Registro de Operador que Inicia / Termina</span>
+  </div>
+  <div class="table-wrapper" tabindex="0" role="region" aria-label="Control de lotes activos en línea">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Código Lote</th>
+          <th scope="col">Receta</th>
+          <th scope="col">Op. Inicia</th>
+          <th scope="col">Op. Actual</th>
+          <th scope="col">Acción de Turno</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in lotes_activos %}
+        <tr>
+          <td class="mono"><strong>{{ l.codigo }}</strong></td>
+          <td>[{{ l.receta.codigo_letra }}] {{ l.receta.nombre }} ({{ l.receta.min_tol }}°–{{ l.receta.max_tol }}°)</td>
+          <td>{{ l.operador_inicio.nombre_completo|default:"Sin iniciar" }}</td>
+          <td>
+            {% if l.operador_activo %}
+              <span class="tag ok">● {{ l.operador_activo.nombre_completo }}</span>
+            {% else %}
+              <span class="tag warn">◌ Sin asignar</span>
+            {% endif %}
+          </td>
+          <td>
+            <form class="sec-form" method="post" action="{% url 'op_lote_accion' l.pk %}" style="display:inline-flex;gap:6px;flex-wrap:wrap">
+              {% csrf_token %}
+              <button class="btn sm sec" type="submit" name="accion" value="iniciar">
+                {% if not l.operador_inicio %}▶ Iniciar lote{% elif l.operador_activo_id != user.pk %}⇄ Asumir relevo{% else %}✓ En turno{% endif %}
+              </button>
+              <button class="btn sm" type="submit" name="accion" value="terminar" onclick="return confirm('¿Confirmas finalizar y cerrar el lote {{ l.codigo }}?');">
+                ■ Terminar lote
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="muted">No hay lotes abiertos actualmente en línea.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="grid g4">
+  <article class="kpi-tile">
+    <div class="kpi-top">
+      <span class="kpi-lbl">Inspecciones hoy</span>
+      <span class="tag info">TURNO</span>
+    </div>
+    <div class="kpi" id="kpi-total">{{ hoy_total }}</div>
+    <div class="kpi-sub" id="kpi-breakdown">✓ {{ hoy_ap }} aprob. · ✕ {{ hoy_re }} rech.</div>
+  </article>
+
+  <article class="kpi-tile">
+    <div class="kpi-top">
+      <span class="kpi-lbl">Conformidad día</span>
+      <span class="tag {% if hoy_tasa >= 90 or not hoy_total %}ok{% else %}warn{% endif %}">CALIDAD</span>
+    </div>
+    <div class="kpi" id="kpi-tasa">{{ hoy_tasa }}%</div>
+    <div class="meter-bar" aria-hidden="true">
+      <div class="meter-fill-ok" id="kpi-bar-ok" style="width:{{ hoy_tasa|unlocalize }}%"></div>
+    </div>
+  </article>
+
+  <article class="kpi-tile">
+    <div class="kpi-top">
+      <span class="kpi-lbl">Lotes abiertos</span>
+      <span class="tag ok">ACTIVOS</span>
+    </div>
+    <div class="kpi" id="kpi-lotes">{{ lotes_abiertos }}</div>
+    <div class="kpi-sub">Habilitados para ingesta API</div>
+  </article>
+
+  <article class="kpi-tile">
+    <div class="kpi-top">
+      <span class="kpi-lbl">Confianza óptica</span>
+      <span class="tag info">CV</span>
+    </div>
+    <div class="kpi" id="kpi-conf" style="font-size:1.35rem">{{ ultima_conf }}</div>
+    <div class="kpi-sub">Calidad geométrica última ráfaga</div>
+  </article>
+</div>
+
+<section class="card" aria-labelledby="rec-alarms-title">
+  <div class="card-header">
+    <h2 id="rec-alarms-title">Eventos y alarmas recientes de línea</h2>
+    <a class="btn sec sm" href="{% url 'op_alarmas' %}">Abrir consola de alarmas →</a>
+  </div>
+  <div id="alarmas" class="alarm-list">
+    {% for a in alarmas %}
+      <div class="alarm-row {{ a.nivel }}">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span class="tag {% if a.nivel == 'critica' %}bad{% else %}info{% endif %}">{% if a.nivel == 'critica' %}▲ Crítica{% else %}● Informativa{% endif %}</span>
+          <span>{{ a.descripcion }}</span>
+        </div>
+        <span class="mono muted" style="font-size:.75rem">{{ a.fecha|date:"d/m H:i:s" }}</span>
+      </div>
+    {% empty %}
+      <div class="muted">Sin alarmas de proceso registradas.</div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
+
+{% block js %}
+<script>
+(function(){
+  const CX = 180, CY = 180, R = 140;
+  function polar(deg, rad) {
+    const norm = ((deg % 360) + 360) % 360;
+    const a = norm * Math.PI / 180;
+    return [CX + rad * Math.cos(a), CY - rad * Math.sin(a)];
+  }
+
+  function initTicks() {
+    const g = document.getElementById('gauge-ticks');
+    if (!g) return;
+    let out = '';
+    for (let d = 0; d < 360; d += 5) {
+      const major30 = d % 30 === 0;
+      const med15 = d % 15 === 0 && !major30;
+      const len = major30 ? 15 : (med15 ? 10 : 6);
+      const [x1, y1] = polar(d, R - 5);
+      const [x2, y2] = polar(d, R - 5 - len);
+      out += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${major30 ? '#334155' : (med15 ? '#64748b' : '#cbd5e1')}" stroke-width="${major30 ? 2 : 1}"/>`;
+      if (major30) {
+        const [tx, ty] = polar(d, R - 32);
+        out += `<text x="${tx.toFixed(1)}" y="${(ty + 3.5).toFixed(1)}" text-anchor="middle" fill="#475569" font-family="monospace" font-size="9.5" font-weight="700">${d}°</text>`;
+      }
+    }
+    g.innerHTML = out;
+  }
+
+  function renderInstrument(ang, minTol, maxTol, estado) {
+    const needle = document.getElementById('gauge-needle');
+    const tail = document.getElementById('gauge-tail');
+    const tip = document.getElementById('gauge-tip');
+    const arc = document.getElementById('gauge-tol-arc');
+    const wedge = document.getElementById('gauge-tol-wedge');
+    const lims = document.getElementById('gauge-limits');
+    const readout = document.getElementById('gauge-readout');
+    const title = document.getElementById('gauge-title');
+    const deltaEl = document.getElementById('h-delta');
+    const tolZone = document.getElementById('tol-zone');
+    const tolMarker = document.getElementById('tol-marker');
+    const tolMin = document.getElementById('tol-min-lbl');
+    const tolMax = document.getElementById('tol-max-lbl');
+    const tolNom = document.getElementById('tol-nom-lbl');
+
+    if (needle && tip && typeof ang === 'number') {
+      const [nx, ny] = polar(ang, R - 10);
+      const [tx, ty] = polar(ang + 180, 42);
+      needle.setAttribute('x2', nx.toFixed(1));
+      needle.setAttribute('y2', ny.toFixed(1));
+      if (tail) {
+        tail.setAttribute('x2', tx.toFixed(1));
+        tail.setAttribute('y2', ty.toFixed(1));
+      }
+      const color = estado === 'Aprobado' ? '#059669' : (estado === 'Rechazado' ? '#c8102e' : '#2563eb');
+      needle.setAttribute('stroke', color);
+      tip.setAttribute('cx', nx.toFixed(1));
+      tip.setAttribute('cy', ny.toFixed(1));
+      tip.setAttribute('fill', color);
+      if (readout) readout.textContent = ang.toFixed(2) + '°';
+      if (title) title.textContent = 'Goniómetro óptico de disco completo: lectura ' + ang.toFixed(1) + ' grados';
+    }
+
+    const hasTol = minTol !== null && maxTol !== null && minTol !== undefined && maxTol !== undefined;
+    if (arc && lims) {
+      if (hasTol) {
+        const visMin = Math.max(0, minTol);
+        const visMax = Math.min(359.5, Math.max(visMin + 2.0, maxTol));
+        const large = (visMax - visMin) > 180 ? 1 : 0;
+        const [ax1, ay1] = polar(visMin, R);
+        const [ax2, ay2] = polar(visMax, R);
+        arc.setAttribute('d', `M ${ax1.toFixed(1)},${ay1.toFixed(1)} A ${R},${R} 0 ${large},0 ${ax2.toFixed(1)},${ay2.toFixed(1)}`);
+        if (wedge) {
+          const [wx1, wy1] = polar(visMin, R - 6);
+          const [wx2, wy2] = polar(visMax, R - 6);
+          wedge.setAttribute('d', `M ${CX},${CY} L ${wx1.toFixed(1)},${wy1.toFixed(1)} A ${R - 6},${R - 6} 0 ${large},0 ${wx2.toFixed(1)},${wy2.toFixed(1)} Z`);
+        }
+        const [lx1, ly1] = polar(minTol, R + 7);
+        const [lx2, ly2] = polar(minTol, R - 10);
+        const [ux1, uy1] = polar(maxTol, R + 7);
+        const [ux2, uy2] = polar(maxTol, R - 10);
+        lims.innerHTML = `<line x1="${lx1.toFixed(1)}" y1="${ly1.toFixed(1)}" x2="${lx2.toFixed(1)}" y2="${ly2.toFixed(1)}" stroke="#059669" stroke-width="2"/>` +
+                         `<line x1="${ux1.toFixed(1)}" y1="${uy1.toFixed(1)}" x2="${ux2.toFixed(1)}" y2="${uy2.toFixed(1)}" stroke="#059669" stroke-width="2"/>`;
+      } else {
+        arc.setAttribute('d', '');
+        if (wedge) wedge.setAttribute('d', '');
+        lims.innerHTML = '';
+      }
+    }
+
+    if (deltaEl) {
+      if (hasTol) {
+        const nom = (minTol + maxTol) / 2;
+        const diff = ang - nom;
+        const sign = diff >= 0 ? '+' : '';
+        if (ang >= minTol && ang <= maxTol) {
+          deltaEl.className = 'angle-delta ok';
+          deltaEl.textContent = `${sign}${diff.toFixed(2)}° vs nominal (${nom.toFixed(1)}°)`;
+        } else {
+          const out = ang < minTol ? (ang - minTol) : (ang - maxTol);
+          deltaEl.className = 'angle-delta bad';
+          deltaEl.textContent = `Fuera de tolerancia (${out >= 0 ? '+' : ''}${out.toFixed(2)}°)`;
+        }
+        const span = Math.max(2, (maxTol - minTol) * 3);
+        const wMin = Math.max(0, nom - span / 2);
+        const wMax = Math.min(180, nom + span / 2);
+        const wLen = Math.max(0.1, wMax - wMin);
+        const zLeft = Math.max(0, Math.min(100, ((minTol - wMin) / wLen) * 100));
+        const zRight = Math.max(0, Math.min(100, ((maxTol - wMin) / wLen) * 100));
+        const mPos = Math.max(2, Math.min(98, ((ang - wMin) / wLen) * 100));
+        if (tolZone) { tolZone.style.left = zLeft + '%'; tolZone.style.width = Math.max(2, zRight - zLeft) + '%'; }
+        if (tolMarker) tolMarker.style.left = mPos + '%';
+        if (tolMin) tolMin.textContent = 'MÍN: ' + minTol + '°';
+        if (tolMax) tolMax.textContent = 'MÁX: ' + maxTol + '°';
+        if (tolNom) tolNom.textContent = 'NOMINAL: ' + nom.toFixed(1) + '°';
+      }
+    }
+  }
+
+  initTicks();
+  {% if ultima %}
+  renderInstrument(
+    {{ ultima.angulo|unlocalize }},
+    {% if ultima.limite_min != None %}{{ ultima.limite_min|unlocalize }}{% else %}null{% endif %},
+    {% if ultima.limite_max != None %}{{ ultima.limite_max|unlocalize }}{% else %}null{% endif %},
+    "{{ ultima.estado_nombre|escapejs }}"
+  );
+  {% endif %}
+
+  let audioEnabled = sessionStorage.getItem('aza_audio') === '1';
+  const audioBtn = document.getElementById('audio-btn');
+  function syncAudioBtn() {
+    if (!audioBtn) return;
+    audioBtn.setAttribute('aria-pressed', audioEnabled ? 'true' : 'false');
+    audioBtn.textContent = audioEnabled ? '🔊 Alerta sonora: ON' : '🔇 Alerta sonora: OFF';
+  }
+  if (audioBtn) {
+    syncAudioBtn();
+    audioBtn.addEventListener('click', function() {
+      audioEnabled = !audioEnabled;
+      sessionStorage.setItem('aza_audio', audioEnabled ? '1' : '0');
+      syncAudioBtn();
+    });
+  }
+
+  function beepReject() {
+    if (!audioEnabled) return;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(660, ctx.currentTime);
+      osc.frequency.setValueAtTime(440, ctx.currentTime + 0.14);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.32);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.33);
+    } catch (e) {}
+  }
+
+  const tagHtml = function(e) {
+    const cls = e === 'Aprobado' ? 'ok' : (e === 'Rechazado' ? 'bad' : 'info');
+    const ico = e === 'Aprobado' ? '✓ ' : (e === 'Rechazado' ? '✕ ' : '◌ ');
+    return `<span class="tag ${cls}">${ico}${e}</span>`;
+  };
+
+  const esc = function(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  };
+
+  let lastId = {% if ultima %}{{ ultima.pk|unlocalize }}{% else %}null{% endif %};
+
+  async function tick() {
+    try {
+      const r = await fetch("{% url 'op_ultima_json' %}", {cache: 'no-store'});
+      if (!r.ok) return;
+      const d = await r.json();
+      const u = d.ultima;
+      if (u) {
+        if (!document.getElementById('h-batch')) {
+          location.reload();
+          return;
+        }
+        const isNew = lastId !== null && u.id !== lastId;
+        lastId = u.id;
+        document.getElementById('h-cod').textContent = u.codigo;
+        document.getElementById('h-hora').textContent = u.hora;
+        if (document.getElementById('h-turno')) document.getElementById('h-turno').textContent = u.turno || '—';
+        document.getElementById('h-estado').innerHTML = tagHtml(u.estado);
+        document.getElementById('h-batch').textContent = u.batch;
+        document.getElementById('h-ang').textContent = u.angulo.toFixed(1) + '°';
+        document.getElementById('h-lote').textContent = u.lote;
+        document.getElementById('h-rec').textContent = u.receta;
+        document.getElementById('h-rng').textContent = u.min !== null ? `${u.min}° – ${u.max}°` : '—';
+        if (document.getElementById('h-op')) document.getElementById('h-op').textContent = u.operador || '—';
+        if (document.getElementById('h-op-ini')) document.getElementById('h-op-ini').textContent = u.op_inicio || 'Pendiente';
+        document.getElementById('detalle-link').setAttribute('href', `/inspeccion/${u.id}/`);
+        const stTxt = document.getElementById('gauge-status-txt');
+        if (stTxt) stTxt.textContent = 'ESTADO: ' + u.estado.toUpperCase();
+        const hero = document.getElementById('hero');
+        if (hero) {
+          hero.className = 'hero-panel ' + (u.estado === 'Aprobado' ? 'state-ok' : (u.estado === 'Rechazado' ? 'state-bad' : 'state-info'));
+        }
+        renderInstrument(u.angulo, u.min, u.max, u.estado);
+        if (isNew && u.estado === 'Rechazado') beepReject();
+      }
+      if (d.kpis) {
+        if (document.getElementById('kpi-total')) document.getElementById('kpi-total').textContent = d.kpis.hoy_total;
+        if (document.getElementById('kpi-breakdown')) document.getElementById('kpi-breakdown').textContent = `✓ ${d.kpis.hoy_ap} aprob. · ✕ ${d.kpis.hoy_re} rech.`;
+        if (document.getElementById('kpi-tasa')) document.getElementById('kpi-tasa').textContent = d.kpis.hoy_tasa + '%';
+        if (document.getElementById('kpi-bar-ok')) document.getElementById('kpi-bar-ok').style.width = d.kpis.hoy_tasa + '%';
+        if (document.getElementById('kpi-lotes')) document.getElementById('kpi-lotes').textContent = d.kpis.lotes_abiertos;
+        if (u && document.getElementById('kpi-conf')) document.getElementById('kpi-conf').textContent = u.confianza || 'ESTÁNDAR';
+      }
+      if (d.alarmas && document.getElementById('alarmas')) {
+        document.getElementById('alarmas').innerHTML = d.alarmas.length ? d.alarmas.map(function(a) {
+          const cls = a.nivel === 'critica' ? 'bad' : 'info';
+          const lbl = a.nivel === 'critica' ? '▲ Crítica' : '● Informativa';
+          return `<div class="alarm-row ${esc(a.nivel)}"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="tag ${cls}">${lbl}</span><span>${esc(a.texto)}</span></div><span class="mono muted" style="font-size:.75rem">${esc(a.hora || '')}</span></div>`;
+        }).join('') : '<div class="muted">Sin alarmas de proceso registradas.</div>';
+      }
+      const sync = document.getElementById('sync-pill');
+      if (sync) sync.textContent = '● Sincronizado · ' + new Date().toLocaleTimeString('es-CL', {hour12: false});
+    } catch (e) {}
+  }
+  setInterval(tick, 5000);
+})();
+</script>
+{% endblock %}

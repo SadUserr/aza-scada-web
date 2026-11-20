@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Consola de alarmas{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-meta">
+    <span class="page-kicker">Operación de Planta · Alertas y Conformidad de Línea</span>
+    <h1>Alarmas</h1>
+    <div class="muted">Monitoreo de rechazos angulares, lotes sin receta e incidencias de captura · actualización cada 5 s</div>
+  </div>
+  <div class="page-actions" id="alarm-tabs">
+    <a class="chip-btn {% if not nivel %}active{% endif %}" href="{% url 'op_alarmas' %}">Todas ({{ counts.todas }})</a>
+    <a class="chip-btn {% if nivel == 'critica' %}active{% endif %}" href="?nivel=critica">Críticas ({{ counts.critica }})</a>
+    <a class="chip-btn {% if nivel == 'informativa' %}active{% endif %}" href="?nivel=informativa">Informativas ({{ counts.informativa }})</a>
+  </div>
+</div>
+
+<form method="get" class="filter-panel" id="alarm-filter-form">
+  <div class="filters">
+    <div>
+      <label for="f-nivel">Filtrar por severidad</label>
+      <select id="f-nivel" name="nivel">
+        <option value="">Todas las severidades</option>
+        <option value="critica" {% if nivel == 'critica' %}selected{% endif %}>Crítica (fuera de tolerancia)</option>
+        <option value="informativa" {% if nivel == 'informativa' %}selected{% endif %}>Informativa (operación / captura)</option>
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button class="btn dark" type="submit">Aplicar</button>
+    </div>
+  </div>
+</form>
+
+<section class="card" id="lista" aria-live="polite">
+  <div class="table-wrapper" tabindex="0" role="region" aria-label="Listado de alarmas del proceso">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Fecha / Hora</th>
+          <th scope="col">Severidad</th>
+          <th scope="col">Categoría</th>
+          <th scope="col">Descripción del evento</th>
+          <th scope="col">Inspección asociada</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in alarmas %}
+        <tr>
+          <td class="mono">{{ a.fecha|date:"d/m/Y H:i:s" }}</td>
+          <td>
+            <span class="tag {% if a.nivel == 'critica' %}bad{% else %}info{% endif %}">
+              {% if a.nivel == 'critica' %}▲ Crítica{% else %}● Informativa{% endif %}
+            </span>
+          </td>
+          <td class="mono">{{ a.tipo }}</td>
+          <td>{{ a.descripcion }}</td>
+          <td class="mono">
+            {% if a.registro_id %}
+              <a href="{% url 'detalle' a.registro_id %}">{{ a.registro.codigo }}</a>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="muted" style="text-align:center;padding:20px">Sin alarmas registradas para este criterio.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block js %}
+<script>
+(function(){
+  const sel = document.getElementById('f-nivel');
+  if (sel) sel.addEventListener('change', function() { sel.form.submit(); });
+  setInterval(async function() {
+    try {
+      const r = await fetch(location.href, {cache: 'no-store'});
+      if (!r.ok) return;
+      const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+      const nuevaLista = doc.querySelector('#lista');
+      const nuevasTabs = doc.querySelector('#alarm-tabs');
+      if (nuevaLista) document.querySelector('#lista').innerHTML = nuevaLista.innerHTML;
+      if (nuevasTabs && document.querySelector('#alarm-tabs')) {
+        document.querySelector('#alarm-tabs').innerHTML = nuevasTabs.innerHTML;
+      }
+    } catch (e) {}
+  }, 5000);
+})();
+</script>
+{% endblock %}

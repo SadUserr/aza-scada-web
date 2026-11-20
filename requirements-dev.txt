@@ -1,0 +1,5 @@
+-r requirements.txt
+playwright>=1.45         # pruebas E2E automatizadas (e2e/)
+locust>=2.29             # pruebas de rendimiento (pruebas/locustfile.py)
+bandit>=1.7              # análisis estático de seguridad
+pip-audit>=2.7           # vulnerabilidades en dependencias

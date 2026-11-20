@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Gestión de lotes{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-meta">
+    <span class="page-kicker">Planificación de Línea · Órdenes de Producción</span>
+    <h1>Gestión de lotes</h1>
+    <div class="muted">Todo lote requiere una receta asignada y codificación con letra de receta + fecha. Registra operador de inicio y término.</div>
+  </div>
+</div>
+
+<div class="grid g-split">
+  <section class="card">
+    <div class="card-header">
+      <h2>Lotes de producción</h2>
+      <span class="mono muted">{{ lotes|length }} lote{{ lotes|length|pluralize }}</span>
+    </div>
+    <div class="table-wrapper" tabindex="0" role="region" aria-label="Tabla de lotes de producción">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Código</th>
+            <th scope="col">Receta obligatoria</th>
+            <th scope="col">Op. Inicio</th>
+            <th scope="col">Op. Fin / Estado</th>
+            <th scope="col" style="text-align:end">Cant. prog.</th>
+            <th scope="col">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in lotes %}
+          <tr>
+            <td class="mono">
+              <strong>{{ l.codigo }}</strong>
+              <div class="muted" style="font-size:.7rem">{{ l.fecha_inicio|date:"d/m/Y H:i" }}</div>
+            </td>
+            <td>[{{ l.receta.codigo_letra }}] {{ l.receta.nombre }}</td>
+            <td>{{ l.operador_inicio.nombre_completo|default:"Por asumir" }}</td>
+            <td>
+              {% if l.abierto %}
+                <span class="tag ok">● Abierto</span>
+                {% if l.operador_activo %}<div class="muted" style="font-size:.72rem">En turno: {{ l.operador_activo.username }}</div>{% endif %}
+              {% else %}
+                <span class="tag bad">■ Cerrado</span>
+                <div class="muted" style="font-size:.72rem">{{ l.operador_fin.nombre_completo|default:"—" }} · {{ l.fecha_fin|date:"d/m H:i" }}</div>
+              {% endif %}
+            </td>
+            <td class="num">{{ l.cantidad }}</td>
+            <td>
+              {% if l.abierto %}
+                <form class="sec-form" method="post" action="{% url 'adm_lote_cerrar' l.pk %}">
+                  {% csrf_token %}
+                  <button class="link" type="submit">Cerrar lote</button>
+                </form>
+              {% else %}
+                <span class="mono muted">Finalizado</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="muted">No hay lotes registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <form method="post" class="card" style="align-self:start">
+    {% csrf_token %}
+    <div class="card-header">
+      <h2>Crear lote de producción</h2>
+    </div>
+    {{ form.non_field_errors }}
+
+    <label for="{{ form.receta.id_for_label }}">Receta metalúrgica (obligatoria)</label>
+    {{ form.receta }}
+    {{ form.receta.errors }}
+    <div id="tol" class="tol-scale-box mt-sm mono" style="font-size:.76rem"></div>
+
+    <label for="{{ form.codigo.id_for_label }}">Código del lote (vacío = autogenerado por receta + fecha)</label>
+    <div style="display:flex;gap:6px">
+      {{ form.codigo }}
+      <button type="button" class="btn sec sm" id="btn-gen-cod" title="Autocompletar código sugerido según la receta elegida">Auto</button>
+    </div>
+    {{ form.codigo.errors }}
+
+    <label for="{{ form.operador_inicio.id_for_label }}">Operador asignado al inicio (opcional)</label>
+    {{ form.operador_inicio }}
+    {{ form.operador_inicio.errors }}
+
+    <label for="{{ form.cantidad.id_for_label }}">Cantidad programada de rollos</label>
+    {{ form.cantidad }}
+    {{ form.cantidad.errors }}
+
+    <button class="btn mt-md" type="submit" style="inline-size:100%">Crear lote</button>
+  </form>
+</div>
+{{ sugerencias|json_script:"sug-codigos" }}
+{% endblock %}
+
+{% block js %}
+<script>
+(function(){
+  const T = {
+    {% for r in recetas %}
+    "{{ r.pk }}": "✓ [{{ r.codigo_letra }}] {{ r.nombre }} · mín {{ r.min_tol }}° · máx {{ r.max_tol }}° ({{ r.material }} · Ø{{ r.espesor_mm }} mm)",
+    {% endfor %}
+  };
+  const sugEl = document.getElementById('sug-codigos');
+  const S = sugEl ? JSON.parse(sugEl.textContent) : {};
+  const sel = document.getElementById('id_receta');
+  const box = document.getElementById('tol');
+  const codInp = document.getElementById('id_codigo');
+  const btnGen = document.getElementById('btn-gen-cod');
+
+  function upd() {
+    if (!sel) return;
+    if (box) box.textContent = T[sel.value] || 'Selecciona una receta activa obligatoria.';
+    if (codInp && S[sel.value]) codInp.placeholder = 'Sugerido: ' + S[sel.value];
+  }
+  if (sel) {
+    sel.addEventListener('change', upd);
+    upd();
+  }
+  if (btnGen && sel && codInp) {
+    btnGen.addEventListener('click', function() {
+      if (S[sel.value]) codInp.value = S[sel.value];
+    });
+  }
+})();
+</script>
+{% endblock %}

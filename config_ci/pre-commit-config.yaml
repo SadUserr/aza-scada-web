@@ -1,0 +1,16 @@
+# Revisión local antes de cada commit (informe 7.3): `pip install pre-commit` y `pre-commit install`.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks                 # impide subir claves, tokens o contraseñas
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.9
+    hooks:
+      - id: bandit
+        args: ["-ll", "-x", "*/tests.py,*/migrations/*"]
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.1
+    hooks:
+      - id: flake8                   # estilo PEP 8
+        args: ["--max-line-length=130", "--exclude=*/migrations/*"]

@@ -1,0 +1,211 @@
+{% extends "base.html" %}{% load l10n %}
+{% block title %}Dashboard de calidad{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-meta">
+    <span class="page-kicker">Aseguramiento de Calidad · Supervisión Metalúrgica</span>
+    <h1>Dashboard de calidad</h1>
+    <div class="muted">Indicadores consolidados de conformidad angular, rendimiento por turno y productividad por operador</div>
+  </div>
+  <div class="page-actions">
+    <a id="btn-exportar-csv" class="btn" href="{% url 'sup_exportar' %}?{{ request.GET.urlencode }}">⬇ Exportar reporte CSV</a>
+    <a class="btn sec" href="{% url 'sup_tendencias' %}?{{ request.GET.urlencode }}">Ver curva de tendencia →</a>
+  </div>
+</div>
+
+<div id="csv-feedback" class="msg info" role="status" aria-live="polite" hidden>
+  Preparando archivo <strong>reporte_inspecciones.csv</strong> con los filtros activos… La descarga comenzará automáticamente.
+</div>
+
+{% include "_filtros.html" %}
+
+<section class="grid g4" aria-label="Indicadores clave de desempeño">
+  <article class="kpi-tile">
+    <div class="kpi-top">
+      <span class="kpi-lbl">Inspecciones evaluadas</span>
+      <span class="tag info">MUESTRA</span>
+    </div>
+    <div class="kpi">{{ total }}</div>
+    <div class="kpi-sub">Registros en el periodo filtrado</div>
+  </article>
+
+  <article class="kpi-tile">
+    <div class="kpi-top">
+      <span class="kpi-lbl">Rollos aprobados</span>
+      <span class="tag ok">✓ {{ tasa_ap }}%</span>
+    </div>
+    <div class="kpi" style="color:var(--ok-ink)">{{ aprobados }}</div>
+    <div class="kpi-sub">Dentro de ventana angular</div>
+  </article>
+
+  <article class="kpi-tile">
+    <div class="kpi-top">
+      <span class="kpi-lbl">Rollos rechazados</span>
+      <span class="tag bad">✕ {{ tasa_re }}%</span>
+    </div>
+    <div class="kpi" style="color:var(--bad-ink)">{{ rechazados }}</div>
+    <div class="kpi-sub">Desviación fuera de receta</div>
+  </article>
+
+  <article class="kpi-tile">
+    <div class="kpi-top">
+      <span class="kpi-lbl">Balance de conformidad</span>
+      <span class="tag {% if tasa_ap >= 90 or not total %}ok{% elif tasa_ap >= 75 %}warn{% else %}bad{% endif %}">ÍNDICE</span>
+    </div>
+    <div class="kpi">{{ tasa_ap }}%</div>
+    <div class="meter-bar" title="Aprobados {{ tasa_ap }}% / Rechazados {{ tasa_re }}%">
+      <div class="meter-fill-ok" style="width:{{ tasa_ap|unlocalize }}%"></div>
+      <div class="meter-fill-bad" style="width:{{ tasa_re|unlocalize }}%"></div>
+    </div>
+  </article>
+</section>
+
+<div class="grid g2">
+  <section class="card">
+    <div class="card-header">
+      <h2>Rendimiento de los 3 turnos de planta</h2>
+      <span class="telemetry-chip">Mañana · Tarde · Noche</span>
+    </div>
+    <div class="table-wrapper" tabindex="0" role="region" aria-label="Rendimiento comparativo de los 3 turnos">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Turno</th>
+            <th scope="col" style="text-align:end">Total</th>
+            <th scope="col" style="text-align:end">Aprob.</th>
+            <th scope="col" style="text-align:end">Rech.</th>
+            <th scope="col" style="text-align:end">Áng. Prom.</th>
+            <th scope="col" style="text-align:end">Conformidad</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in rendimiento_turnos %}
+          <tr>
+            <td>
+              <strong>{{ t.nombre }}</strong>
+              <div class="mono muted" style="font-size:.7rem">{{ t.horario }}</div>
+            </td>
+            <td class="num">{{ t.total }}</td>
+            <td class="num" style="color:var(--ok-ink)">{{ t.aprobados }}</td>
+            <td class="num" style="color:var(--bad-ink)">{{ t.rechazados }}</td>
+            <td class="num">{% if t.prom != None %}{{ t.prom }}°{% else %}—{% endif %}</td>
+            <td class="num">
+              {% if t.total %}
+                <span class="tag {% if t.tasa >= 90 %}ok{% elif t.tasa >= 75 %}warn{% else %}bad{% endif %}">{{ t.tasa }}%</span>
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">
+      <h2>Rendimiento por operador</h2>
+      <span class="telemetry-chip">Productividad y Calidad</span>
+    </div>
+    <div class="table-wrapper" tabindex="0" role="region" aria-label="Estadísticas de rendimiento por operador">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Operador</th>
+            <th scope="col" style="text-align:end">Rollos</th>
+            <th scope="col" style="text-align:end">Rech.</th>
+            <th scope="col" style="text-align:end">Lotes (Ini/Fin)</th>
+            <th scope="col" style="text-align:end">Conformidad</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for op in rendimiento_operadores %}
+          <tr>
+            <td>
+              <strong>{{ op.nombre }}</strong>
+              <div class="mono muted" style="font-size:.7rem">{{ op.username }}</div>
+            </td>
+            <td class="num">{{ op.total }}</td>
+            <td class="num" style="color:var(--bad-ink)">{{ op.rechazados }}</td>
+            <td class="num">{{ op.iniciados }} / {{ op.finalizados }}</td>
+            <td class="num">
+              {% if op.total %}
+                <span class="tag {% if op.tasa >= 90 %}ok{% elif op.tasa >= 75 %}warn{% else %}bad{% endif %}">{{ op.tasa }}%</span>
+              {% else %}
+                <span class="muted">Sin disparos</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="muted">No hay operadores registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div class="grid g2">
+  <section class="card">
+    <div class="card-header">
+      <h2>Distribución por receta</h2>
+    </div>
+    <div class="table-wrapper" tabindex="0" role="region" aria-label="Inspecciones agrupadas por receta">
+      <table>
+        <thead>
+          <tr><th scope="col">Receta / Producto</th><th scope="col" style="text-align:end">Cant.</th></tr>
+        </thead>
+        <tbody>
+          {% for k, n in por_receta %}
+          <tr>
+            <td><strong>{{ k }}</strong></td>
+            <td class="num">{{ n }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="2" class="muted">Sin datos en el rango.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">
+      <h2>Confianza óptica de captura</h2>
+    </div>
+    <div class="table-wrapper" tabindex="0" role="region" aria-label="Inspecciones por nivel de confianza del ángulo">
+      <table>
+        <thead>
+          <tr><th scope="col">Nivel angle_confidence</th><th scope="col" style="text-align:end">Cant.</th></tr>
+        </thead>
+        <tbody>
+          {% for k, n in por_confianza %}
+          <tr>
+            <td class="mono"><strong>{{ k }}</strong></td>
+            <td class="num">{{ n }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="2" class="muted">Sin datos semiestructurados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+(function(){
+  const btn = document.getElementById('btn-exportar-csv');
+  const box = document.getElementById('csv-feedback');
+  if (btn && box) {
+    btn.addEventListener('click', function() {
+      box.hidden = false;
+      setTimeout(function() { box.hidden = true; }, 6000);
+    });
+  }
+})();
+</script>
+{% endblock %}

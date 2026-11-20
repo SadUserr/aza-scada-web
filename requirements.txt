@@ -1,0 +1,4 @@
+Django>=5.0,<6
+whitenoise>=6.6          # archivos estáticos en producción
+gunicorn>=22.0           # servidor WSGI en Render (no se usa en Windows)
+psycopg[binary]>=3.1     # solo si usas PostgreSQL (DB_NAME definido)

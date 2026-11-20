@@ -1,0 +1,124 @@
+{% extends "base.html" %}{% load l10n %}
+{% block title %}Trazabilidad por lote{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-meta">
+    <span class="page-kicker">Aseguramiento de Calidad · Trazabilidad Siderúrgica</span>
+    <h1>Trazabilidad por lote</h1>
+    <div class="muted">Consulta integral del expediente de un lote: receta asignada, operadores de inicio/término, avance y batches</div>
+  </div>
+</div>
+
+<form method="get" class="filter-panel">
+  {% if lotes_recientes %}
+  <div class="preset-bar">
+    <span class="preset-lbl">Lotes recientes:</span>
+    {% for lr in lotes_recientes %}
+      <a class="chip-btn {% if q == lr.codigo %}active{% endif %}" href="?q={{ lr.codigo|urlencode }}">{{ lr.codigo }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <div class="filters">
+    <div>
+      <label for="q-lote">Código exacto de lote</label>
+      <input id="q-lote" name="q" value="{{ q }}" placeholder="Ej. A-20261116-01" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div class="filter-actions">
+      <button class="btn dark" type="submit">Buscar expediente</button>
+    </div>
+  </div>
+</form>
+
+{% if aviso %}
+  <div class="msg warning" role="alert">{{ aviso }}</div>
+{% endif %}
+
+{% if lote %}
+<section class="card" style="border-inline-start:4px solid {% if lote.abierto %}var(--ok-accent){% else %}var(--muted){% endif %}">
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <h2>Expediente Lote {{ lote.codigo }}</h2>
+      <span class="tag {% if lote.abierto %}ok{% else %}info{% endif %}">{% if lote.abierto %}● Lote Abierto{% else %}■ Lote Cerrado{% endif %}</span>
+    </div>
+    <a class="btn sec sm" href="{% url 'sup_tendencias' %}?lote={{ lote.codigo|urlencode }}">Ver gráfica del lote →</a>
+  </div>
+
+  <div class="grid g3">
+    <div class="meta-cell">
+      <span class="meta-lbl">Receta asociada</span>
+      <span class="meta-val">[{{ lote.receta.codigo_letra }}] {{ lote.receta.nombre }}</span>
+    </div>
+    <div class="meta-cell">
+      <span class="meta-lbl">Tolerancia nominal</span>
+      <span class="meta-val">{{ lote.receta.min_tol }}° – {{ lote.receta.max_tol }}°</span>
+    </div>
+    <div class="meta-cell">
+      <span class="meta-lbl">Conformidad / Avance</span>
+      <span class="meta-val">{{ lote_stats.tasa_ap }}% ({{ lote_stats.total }} / {{ lote.cantidad }} prog.)</span>
+    </div>
+    <div class="meta-cell">
+      <span class="meta-lbl">Apertura / Cierre</span>
+      <span class="meta-val">{{ lote.fecha_inicio|date:"d/m/Y H:i" }}{% if lote.fecha_fin %} → {{ lote.fecha_fin|date:"d/m H:i" }}{% endif %}</span>
+    </div>
+    <div class="meta-cell">
+      <span class="meta-lbl">Operador que inicia</span>
+      <span class="meta-val">{{ lote.operador_inicio.nombre_completo|default:"—" }}</span>
+    </div>
+    <div class="meta-cell">
+      <span class="meta-lbl">Operador que termina</span>
+      <span class="meta-val">{{ lote.operador_fin.nombre_completo|default:"En curso" }}</span>
+    </div>
+  </div>
+
+  {% if lote_stats.avance != None %}
+  <div class="mt-sm">
+    <div class="meter-bar" title="Avance de lote: {{ lote_stats.avance }}%">
+      <div class="meter-fill-ok" style="width:{{ lote_stats.avance|unlocalize }}%"></div>
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <div class="card-header">
+    <h2>Secuencia de batches inspeccionados ({{ insp|length }})</h2>
+  </div>
+  <div class="table-wrapper" tabindex="0" role="region" aria-label="Inspecciones del lote {{ lote.codigo }}">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Inspección</th>
+          <th scope="col">Batch</th>
+          <th scope="col">Fecha / Hora</th>
+          <th scope="col">Turno</th>
+          <th scope="col">Operador</th>
+          <th scope="col" style="text-align:end">Ángulo</th>
+          <th scope="col">Estado</th>
+          <th scope="col" style="text-align:end">Observaciones</th>
+          <th scope="col" style="text-align:end">Alarmas</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in insp %}
+        <tr>
+          <td class="mono"><a href="{% url 'detalle' r.pk %}">{{ r.codigo }}</a></td>
+          <td class="mono"><strong>{{ r.id_batch }}</strong></td>
+          <td class="mono">{{ r.fecha|date:"d/m/Y H:i:s" }}</td>
+          <td>{{ r.turno.nombre|default:"—" }}</td>
+          <td>{{ r.operador.nombre_completo|default:"—" }}</td>
+          <td class="num">{{ r.angulo|floatformat:2 }}°</td>
+          <td>{% include "_estado.html" with estado=r.estado_nombre %}</td>
+          <td class="num">{{ r.observaciones.all|length }}</td>
+          <td class="num">{{ r.alarmas.all|length }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" class="muted" style="text-align:center;padding:18px">Este lote aún no registra disparos de inspección.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Gestión de recetas{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-meta">
+    <span class="page-kicker">Ingeniería de Proceso · Especificaciones Metalúrgicas</span>
+    <h1>Gestión de recetas</h1>
+    <div class="muted">Definición de códigos de letra, espesores, calidades de acero y ventanas de tolerancia angular (0° – 180°)</div>
+  </div>
+</div>
+
+<div class="grid g-split">
+  <section class="card">
+    <div class="card-header">
+      <h2>Catálogo de recetas</h2>
+      <span class="mono muted">{{ recetas|length }} registrada{{ recetas|length|pluralize }}</span>
+    </div>
+    <div class="table-wrapper" tabindex="0" role="region" aria-label="Catálogo de recetas de trefilado">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Letra</th>
+            <th scope="col">Receta</th>
+            <th scope="col">Espesor / Material</th>
+            <th scope="col" style="text-align:end">Mín</th>
+            <th scope="col" style="text-align:end">Máx</th>
+            <th scope="col" style="text-align:end">Lotes</th>
+            <th scope="col">Estado</th>
+            <th scope="col">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in recetas %}
+          <tr>
+            <td class="mono"><span class="tag info">{{ r.codigo_letra }}</span></td>
+            <td><strong>{{ r.nombre }}</strong></td>
+            <td class="mono">Ø {{ r.espesor_mm }} mm · {{ r.material }}</td>
+            <td class="num">{{ r.min_tol }}°</td>
+            <td class="num">{{ r.max_tol }}°</td>
+            <td class="num">{{ r.n }}</td>
+            <td>
+              <span class="tag {% if r.activo %}ok{% else %}bad{% endif %}">
+                {% if r.activo %}✓ Activa{% else %}✕ Inactiva{% endif %}
+              </span>
+            </td>
+            <td>
+              <a href="{% url 'adm_receta_editar' r.pk %}">Modificar</a>
+              ·
+              <form class="sec-form" method="post" action="{% url 'adm_receta_toggle' r.pk %}">
+                {% csrf_token %}
+                <button class="link" type="submit">{% if r.activo %}Desactivar{% else %}Activar{% endif %}</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="muted">Sin recetas registradas.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="muted mt-sm">
+      Regla operacional: todo lote de producción requiere una receta asignada. Las recetas con historial no se eliminan físicamente (solo se desactivan).
+    </p>
+  </section>
+
+  <form method="post" class="card" style="align-self:start">
+    {% csrf_token %}
+    <div class="card-header">
+      <h2>{% if editando %}Modificar receta: {{ editando.nombre }}{% else %}Nueva receta metalúrgica{% endif %}</h2>
+    </div>
+    {{ form.non_field_errors }}
+
+    <div class="grid g2">
+      <div>
+        <label for="{{ form.codigo_letra.id_for_label }}">Código / Letra (lotes)</label>
+        {{ form.codigo_letra }}
+        {{ form.codigo_letra.errors }}
+      </div>
+      <div>
+        <label for="{{ form.nombre.id_for_label }}">Nombre de receta</label>
+        {{ form.nombre }}
+        {{ form.nombre.errors }}
+      </div>
+    </div>
+
+    <div class="grid g2">
+      <div>
+        <label for="{{ form.espesor_mm.id_for_label }}">Espesor nominal (mm)</label>
+        {{ form.espesor_mm }}
+        {{ form.espesor_mm.errors }}
+      </div>
+      <div>
+        <label for="{{ form.material.id_for_label }}">Grado de acero</label>
+        {{ form.material }}
+        {{ form.material.errors }}
+      </div>
+    </div>
+
+    <div class="grid g2">
+      <div>
+        <label for="{{ form.min_tol.id_for_label }}">Tolerancia mínima (°)</label>
+        {{ form.min_tol }}
+        {{ form.min_tol.errors }}
+      </div>
+      <div>
+        <label for="{{ form.max_tol.id_for_label }}">Tolerancia máxima (°)</label>
+        {{ form.max_tol }}
+        {{ form.max_tol.errors }}
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-block-start:16px;flex-wrap:wrap">
+      <button class="btn" type="submit">Guardar</button>
+      {% if editando %}
+        <a class="btn sec" href="{% url 'adm_recetas' %}">Cancelar</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}

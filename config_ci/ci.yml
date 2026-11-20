@@ -1,0 +1,52 @@
+# Integración continua (informe 7.3 y 9.1): cada push o pull request ejecuta las pruebas automatizadas,
+# el análisis estático de seguridad y la revisión de vulnerabilidades de dependencias.
+name: CI
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    services:
+      postgres:                       # mismo motor que producción (Supabase)
+        image: postgres:16
+        env: {POSTGRES_DB: aza, POSTGRES_USER: aza, POSTGRES_PASSWORD: aza}
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U aza" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DB_NAME: aza
+      DB_USER: aza
+      DB_PASSWORD: aza
+      DB_HOST: localhost
+      DB_SSLMODE: disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - name: Dependencias
+        run: |
+          pip install -r requirements-dev.txt
+          playwright install --with-deps chromium
+      - name: Revisión del proyecto y migraciones pendientes
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+      - name: Pruebas unitarias, de integración, seguridad y E2E
+        run: python manage.py test -v 2
+      - name: Análisis estático de seguridad (Bandit)
+        run: bandit -r aza cuentas trazabilidad -x "*/tests.py,*/migrations/*" -ll
+      - name: Vulnerabilidades en dependencias (pip-audit)
+        run: pip-audit -r requirements.txt
+
+  secretos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Búsqueda de secretos en el historial (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

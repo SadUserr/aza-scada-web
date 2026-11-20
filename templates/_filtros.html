@@ -1,0 +1,99 @@
+{% if error %}<div class="err" role="alert">{{ error }}</div>{% endif %}
+<form method="get" class="filter-panel" id="filter-form">
+  <div class="preset-bar" aria-label="Filtros rápidos">
+    <span class="preset-lbl">Accesos rápidos:</span>
+    <button type="button" class="chip-btn" data-preset="hoy">Hoy</button>
+    <button type="button" class="chip-btn" data-preset="7d">Últimos 7 días</button>
+    <button type="button" class="chip-btn" data-preset="rechazados">Solo Rechazados</button>
+    <button type="button" class="chip-btn" data-preset="aprobados">Solo Aprobados</button>
+    <a class="chip-btn" href="{{ request.path }}">Limpiar</a>
+  </div>
+  <div class="filters">
+    <div>
+      <label for="f-desde">Desde</label>
+      <input id="f-desde" type="date" name="desde" value="{{ f.desde|date:'Y-m-d'|default:f.desde }}">
+    </div>
+    <div>
+      <label for="f-hasta">Hasta</label>
+      <input id="f-hasta" type="date" name="hasta" value="{{ f.hasta|date:'Y-m-d'|default:f.hasta }}">
+    </div>
+    <div>
+      <label for="f-lote">Código de lote</label>
+      <input id="f-lote" name="lote" value="{{ f.lote }}" placeholder="Ej. A-20261116-01" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div>
+      <label for="f-receta">Receta</label>
+      <select id="f-receta" name="receta">
+        <option value="">Todas las recetas</option>
+        {% for r in recetas %}
+          <option value="{{ r.pk }}" {% if f.receta == r.pk|stringformat:'s' %}selected{% endif %}>[{{ r.codigo_letra }}] {{ r.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="f-estado">Estado</label>
+      <select id="f-estado" name="estado">
+        <option value="">Todos los estados</option>
+        {% for k, v in estados %}
+          <option value="{{ k }}" {% if f.estado == k %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if turnos %}
+    <div>
+      <label for="f-turno">Turno</label>
+      <select id="f-turno" name="turno">
+        <option value="">Todos los turnos (3)</option>
+        {% for t in turnos %}
+          <option value="{{ t.pk }}" {% if f.turno == t.pk|stringformat:'s' %}selected{% endif %}>{{ t.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if operadores %}
+    <div>
+      <label for="f-operador">Operador</label>
+      <select id="f-operador" name="operador">
+        <option value="">Todos los operadores</option>
+        {% for op in operadores %}
+          <option value="{{ op.pk }}" {% if f.operador == op.pk|stringformat:'s' %}selected{% endif %}>{{ op.nombre_completo|default:op.username }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="filter-actions">
+      <button class="btn dark" type="submit">Filtrar</button>
+    </div>
+  </div>
+</form>
+<script>
+(function(){
+  const form = document.getElementById('filter-form');
+  if (!form) return;
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  form.querySelectorAll('[data-preset]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const p = btn.getAttribute('data-preset');
+      const now = new Date();
+      const desde = document.getElementById('f-desde');
+      const hasta = document.getElementById('f-hasta');
+      const est = document.getElementById('f-estado');
+      if (p === 'hoy') {
+        desde.value = fmt(now);
+        hasta.value = fmt(now);
+      } else if (p === '7d') {
+        const d7 = new Date(now);
+        d7.setDate(d7.getDate() - 7);
+        desde.value = fmt(d7);
+        hasta.value = fmt(now);
+      } else if (p === 'rechazados' && est) {
+        est.value = 'Rechazado';
+      } else if (p === 'aprobados' && est) {
+        est.value = 'Aprobado';
+      }
+      form.submit();
+    });
+  });
+})();
+</script>

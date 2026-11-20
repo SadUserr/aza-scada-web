@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Recuperar contraseña{% endblock %}
+{% block content %}
+<form method="post" class="auth-card">
+  {% csrf_token %}
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-block-end:12px">
+    <span class="logo">AZA</span>
+    <span class="mono muted" style="font-size:.7rem">PROTOCOLO INTERNO · PLANTA RENCA</span>
+  </div>
+  <h1>Recuperar contraseña</h1>
+  <p class="muted" style="margin-block:6px 12px">
+    Por seguridad operativa en red industrial, el sistema no emplea correo externo: tu solicitud se registra en la consola del Administrador para emitir una clave temporal con cambio obligatorio.
+  </p>
+
+  {% if enviado %}<div class="msg success" role="status">{{ enviado }}</div>{% endif %}
+
+  <label for="id-rec-user">Nombre de usuario</label>
+  <input id="id-rec-user" name="username" autocomplete="username" autocorrect="off" autocapitalize="off" spellcheck="false" required>
+
+  <div style="display:flex;gap:8px;margin-block-start:16px;flex-wrap:wrap">
+    <button class="btn" type="submit">Enviar solicitud</button>
+    <a class="btn sec" href="{% url 'login' %}">Volver al acceso</a>
+  </div>
+</form>
+{% endblock %}

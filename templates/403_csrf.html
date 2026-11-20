@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Sesión de formulario expirada{% endblock %}
+{% block content %}
+<section class="card" style="max-inline-size:520px;margin:32px auto;border-inline-start:4px solid var(--warn-accent);text-align:center;padding:28px 24px">
+  <div style="font-size:2rem;margin-bottom:8px">🔒</div>
+  <span class="page-kicker">Seguridad de Acceso · Verificación de Formulario</span>
+  <h1 style="margin-block:6px 12px;font-size:1.35rem">Sesión de seguridad desincronizada</h1>
+  <p class="muted" style="margin-block-end:20px;line-height:1.45;font-size:.9rem">
+    El token de seguridad del formulario no coincide con la sesión actual del navegador (ocurre comúnmente si la página quedó abierta al reiniciar el servidor o tras usar el botón Atrás).
+  </p>
+  <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap">
+    <a class="btn" href="{% url 'login' %}">↻ Recargar e Iniciar Sesión</a>
+    <a class="btn sec" href="javascript:location.reload(true)">Refrescar página</a>
+  </div>
+</section>
+{% endblock %}

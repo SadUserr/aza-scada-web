@@ -1,0 +1,186 @@
+{% load static %}<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SCADA Trefilado{% endblock %} · Aceros AZA</title>
+  <link rel="stylesheet" href="{% static 'aza.css' %}">
+</head>
+<body>
+<a href="#main-content" class="skip-link visually-hidden">Saltar al contenido principal</a>
+{% with cur=request.resolver_match.url_name %}
+{% if user.is_authenticated and cur != 'login' and cur != 'recuperar' %}
+<div class="scada-shell">
+  <nav id="menu" class="scada-rail" aria-label="Principal">
+    <div class="rail-top">
+      <div class="rail-brand">
+        <div class="logo">AZA</div>
+        <div class="rail-brand-meta">
+          <span class="rail-brand-title">Línea Trefilado</span>
+          <span class="rail-brand-sub">Aceros AZA · Renca</span>
+        </div>
+      </div>
+
+      <div class="rail-pulse" title="Enlace API con nodo de visión artificial">
+        <span class="pulse-left"><span class="beacon-dot" aria-hidden="true"></span>En línea · 5s</span>
+        <span class="pulse-tag">JETSON-CV</span>
+      </div>
+
+      <div class="rail-section-lbl">Módulos · {{ user.rol_nombre }}</div>
+      <div class="rail-links">
+        {% if user.rol_nombre == 'Operador' %}
+          <a class="rail-link" href="{% url 'op_inspeccion' %}" {% if cur == 'op_inspeccion' %}aria-current="page"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 12L17 7"/><circle cx="12" cy="12" r="2"/></svg>
+            <span>Inspección en vivo</span>
+          </a>
+          <a class="rail-link" href="{% url 'op_historial' %}" {% if cur == 'op_historial' %}aria-current="page"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h12"/></svg>
+            <span>Historial de lotes</span>
+          </a>
+          <a class="rail-link" href="{% url 'op_alarmas' %}" {% if cur == 'op_alarmas' %}aria-current="page"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>Alarmas de línea</span>
+          </a>
+        {% elif user.rol_nombre == 'Supervisor' %}
+          <a class="rail-link" href="{% url 'sup_dashboard' %}" {% if cur == 'sup_dashboard' %}aria-current="page"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+            <span>Dashboard calidad</span>
+          </a>
+          <a class="rail-link" href="{% url 'sup_tendencias' %}" {% if cur == 'sup_tendencias' %}aria-current="page"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            <span>Tendencias angulares</span>
+          </a>
+          <a class="rail-link" href="{% url 'sup_lote' %}" {% if cur == 'sup_lote' %}aria-current="page"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span>Trazabilidad por lote</span>
+          </a>
+        {% elif user.rol_nombre == 'Administrador' %}
+          <a class="rail-link" href="{% url 'adm_panel' %}" {% if cur == 'adm_panel' %}aria-current="page"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+            <span>Panel y auditoría</span>
+          </a>
+          <a class="rail-link" href="{% url 'adm_usuarios' %}" {% if cur == 'adm_usuarios' %}aria-current="page"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+            <span>Usuarios y accesos</span>
+          </a>
+          <a class="rail-link" href="{% url 'adm_recetas' %}" {% if cur == 'adm_recetas' or cur == 'adm_receta_editar' %}aria-current="page"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg>
+            <span>Recetas metalúrgicas</span>
+          </a>
+          <a class="rail-link" href="{% url 'adm_lotes' %}" {% if cur == 'adm_lotes' %}aria-current="page"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            <span>Lotes de producción</span>
+          </a>
+          <a class="rail-link" href="{% url 'adm_tokens' %}" {% if cur == 'adm_tokens' %}aria-current="page"{% endif %}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            <span>Tokens de captura</span>
+          </a>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="rail-bottom">
+      <div class="operator-card">
+        <span class="operator-lbl">Estación autenticada</span>
+        <span class="operator-name">{{ user.nombre_completo|default:user.username }}</span>
+        <span class="operator-role">ID: {{ user.username }} · {{ user.rol_nombre }}</span>
+      </div>
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button class="btn-logout" type="submit">Cerrar sesión</button>
+      </form>
+    </div>
+  </nav>
+  <div id="rail-backdrop" class="rail-backdrop" aria-hidden="true"></div>
+
+  <div class="scada-workspace">
+    <header class="scada-topbar">
+      <div class="topbar-left">
+        <button id="menu-btn" type="button" aria-label="Abrir menú de navegación" aria-controls="menu" aria-expanded="false">☰</button>
+        <div class="station-context">
+          <span class="station-dot" aria-hidden="true"></span>
+          <div>
+            <div class="station-title">Planta Renca · Trefilado</div>
+            <div class="station-sub">ROBOTIC SYSTEMS CHILE · TRAZABILIDAD ANGULAR</div>
+          </div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        {% block topbar_extra %}{% endblock %}
+        <span class="telemetry-chip" id="scada-clock">CL · --:--:--</span>
+        <span class="telemetry-chip ok">{{ user.rol_nombre }}</span>
+      </div>
+    </header>
+
+    <main id="main-content" tabindex="-1" class="scada-canvas">
+{% else %}
+<div class="auth-shell">
+  <header class="auth-topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="logo">AZA</span>
+      <div>
+        <div style="font-weight:800;font-size:.88rem;letter-spacing:.04em;text-transform:uppercase">Aceros AZA · Planta Renca</div>
+        <div style="font-family:var(--font-mono);font-size:.68rem;color:#94a3b8">SISTEMA DE MONITOREO Y TRAZABILIDAD DEL TREFILADO</div>
+      </div>
+    </div>
+    <span class="telemetry-chip" style="background:#1d232e;border-color:#2d3646;color:#cbd5e1">RED DE PLANTA · ACCESO SEGURO</span>
+  </header>
+  <main id="main-content" tabindex="-1" class="center">
+{% endif %}
+      {% for m in messages %}
+        <div class="msg {{ m.tags }}" role="status" aria-live="polite">{{ m }}</div>
+      {% endfor %}
+      {% block content %}{% endblock %}
+{% if user.is_authenticated and cur != 'login' and cur != 'recuperar' %}
+    </main>
+  </div>
+</div>
+{% else %}
+  </main>
+</div>
+{% endif %}
+{% endwith %}
+<script>
+(function(){
+  const btn = document.getElementById('menu-btn');
+  const nav = document.getElementById('menu');
+  const backdrop = document.getElementById('rail-backdrop');
+  function setMenu(open) {
+    if (!nav || !btn) return;
+    nav.classList.toggle('open', open);
+    if (backdrop) backdrop.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  if (btn && nav) {
+    btn.addEventListener('click', function() {
+      setMenu(!nav.classList.contains('open'));
+    });
+    if (backdrop) backdrop.addEventListener('click', function() { setMenu(false); });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && nav.classList.contains('open')) setMenu(false);
+    });
+  }
+  const clk = document.getElementById('scada-clock');
+  if (clk) {
+    const upd = function() {
+      const now = new Date();
+      clk.textContent = 'CL · ' + now.toLocaleTimeString('es-CL', {hour12: false});
+    };
+    upd();
+    setInterval(upd, 1000);
+  }
+  document.querySelectorAll('[data-pwd-toggle]').forEach(function(t) {
+    t.addEventListener('click', function() {
+      const inp = document.getElementById(t.getAttribute('data-pwd-toggle'));
+      if (!inp) return;
+      const show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password';
+      t.setAttribute('aria-pressed', show ? 'true' : 'false');
+      t.textContent = show ? 'OCULTAR' : 'MOSTRAR';
+    });
+  });
+})();
+</script>
+{% block js %}{% endblock %}
+</body>
+</html>

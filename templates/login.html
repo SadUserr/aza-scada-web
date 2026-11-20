@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Iniciar sesión{% endblock %}
+{% block content %}
+<form method="post" class="auth-card" novalidate>
+  {% csrf_token %}
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-block-end:12px">
+    <span class="logo">AZA</span>
+    <span class="mono muted" style="font-size:.7rem">ESTACIÓN DE CONTROL · PLANTA RENCA</span>
+  </div>
+  <h1>Monitoreo de Trefilado</h1>
+  <p class="muted" style="margin-block:4px 12px">Aceros AZA · Planta Renca · Identificación de operador o supervisor</p>
+
+  {% if error %}<div class="err" role="alert">{{ error }}</div>{% endif %}
+
+  <label for="id-username">Usuario de estación</label>
+  <input id="id-username" name="username" autocomplete="username" autocorrect="off" autocapitalize="off" spellcheck="false" autofocus>
+
+  <label for="id-password">Contraseña</label>
+  <div class="pwd-wrap">
+    <input id="id-password" type="password" name="password" autocomplete="current-password">
+    <button type="button" class="pwd-toggle" data-pwd-toggle="id-password" aria-pressed="false" aria-label="Mostrar u ocultar contraseña">MOSTRAR</button>
+  </div>
+
+  <button class="btn" type="submit" style="inline-size:100%;margin-block-start:16px">Ingresar</button>
+
+  <div style="margin-block-start:14px;padding-block-start:12px;border-block-start:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:.82rem">
+    <a href="{% url 'recuperar' %}">¿Olvidaste tu contraseña?</a>
+    <span class="mono muted" style="font-size:.68rem">ACCESO AUTORIZADO</span>
+  </div>
+</form>
+{% endblock %}

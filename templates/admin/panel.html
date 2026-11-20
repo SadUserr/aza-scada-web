@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Panel Ejecutivo y Auditoría{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-meta">
+    <span class="page-kicker">Administración de Planta · Control Ejecutivo y Trazabilidad</span>
+    <h1>Panel general y auditoría</h1>
+    <div class="muted">Información clave de planta, seguridad operativa y registro completo de acciones por usuario</div>
+  </div>
+  <div class="page-actions">
+    <a class="btn sec sm" href="{% url 'adm_lotes' %}">Gestionar lotes</a>
+    <a class="btn sec sm" href="{% url 'adm_usuarios' %}">Gestionar usuarios</a>
+  </div>
+</div>
+
+<section class="grid g4" aria-label="Indicadores ejecutivos de planta">
+  <article class="kpi-tile">
+    <div class="kpi-top">
+      <span class="kpi-lbl">Producción hoy / 7 días</span>
+      <span class="tag info">PLANTA</span>
+    </div>
+    <div class="kpi">{{ resumen.insp_hoy }} <span style="font-size:.95rem;color:var(--muted)">/ {{ resumen.insp_7d }}</span></div>
+    <div class="kpi-sub">Conformidad 7d: <strong>{{ resumen.tasa_7d }}%</strong></div>
+  </article>
+
+  <article class="kpi-tile">
+    <div class="kpi-top">
+      <span class="kpi-lbl">Lotes abiertos / Recetas</span>
+      <span class="tag ok">LÍNEA</span>
+    </div>
+    <div class="kpi">{{ resumen.lotes_abiertos }} <span style="font-size:.95rem;color:var(--muted)">/ {{ resumen.recetas_activas }}</span></div>
+    <div class="kpi-sub">Tokens de captura activos: {{ resumen.tokens_activos }}</div>
+  </article>
+
+  <article class="kpi-tile">
+    <div class="kpi-top">
+      <span class="kpi-lbl">Alarmas críticas (7d)</span>
+      <span class="tag {% if resumen.alarmas_criticas %}bad{% else %}ok{% endif %}">ALERTA</span>
+    </div>
+    <div class="kpi" style="color:{% if resumen.alarmas_criticas %}var(--bad-ink){% else %}var(--ok-ink){% endif %}">{{ resumen.alarmas_criticas }}</div>
+    <div class="kpi-sub">Solicitudes clave pendientes: {{ resumen.solicitudes_pendientes }}</div>
+  </article>
+
+  <article class="kpi-tile">
+    <div class="kpi-top">
+      <span class="kpi-lbl">Auditoría / Bloqueos</span>
+      <span class="tag info">SEGURIDAD</span>
+    </div>
+    <div class="kpi">{{ resumen.acciones_hoy }}</div>
+    <div class="kpi-sub">Eventos hoy · Cuentas bloqueadas: {{ resumen.cuentas_bloqueadas }}</div>
+  </article>
+</section>
+
+<div class="grid g2">
+  <section class="card">
+    <div class="card-header">
+      <h2>Lotes en producción actualmente abiertos</h2>
+      <span class="mono muted">{{ lotes_en_curso|length }} abierto{{ lotes_en_curso|length|pluralize }}</span>
+    </div>
+    <div class="table-wrapper" tabindex="0" role="region" aria-label="Lotes activos en línea">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Lote</th>
+            <th scope="col">Receta</th>
+            <th scope="col">Op. Inicio</th>
+            <th scope="col">Op. Actual</th>
+            <th scope="col" style="text-align:end">Avance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in lotes_en_curso %}
+          <tr>
+            <td class="mono"><strong>{{ l.codigo }}</strong></td>
+            <td>[{{ l.receta.codigo_letra }}] {{ l.receta.nombre }}</td>
+            <td>{{ l.operador_inicio.nombre_completo|default:"—" }}</td>
+            <td>{{ l.operador_activo.nombre_completo|default:"Sin asignar" }}</td>
+            <td class="num">{{ l.n_insp }} / {{ l.cantidad }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="muted">Sin lotes abiertos.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">
+      <h2>Rendimiento semanal de los 3 turnos</h2>
+      <span class="telemetry-chip">Últimos 7 días</span>
+    </div>
+    <div class="table-wrapper" tabindex="0" role="region" aria-label="Resumen de los 3 turnos">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Turno</th>
+            <th scope="col" style="text-align:end">Total</th>
+            <th scope="col" style="text-align:end">Rech.</th>
+            <th scope="col" style="text-align:end">Conformidad</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in rendimiento_turnos %}
+          <tr>
+            <td><strong>{{ t.nombre }}</strong> <span class="mono muted">({{ t.horario }})</span></td>
+            <td class="num">{{ t.total }}</td>
+            <td class="num" style="color:var(--bad-ink)">{{ t.rechazados }}</td>
+            <td class="num">
+              {% if t.total %}
+                <span class="tag {% if t.tasa >= 90 %}ok{% elif t.tasa >= 75 %}warn{% else %}bad{% endif %}">{{ t.tasa }}%</span>
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<section class="card" aria-labelledby="audit-title">
+  <div class="card-header">
+    <h2 id="audit-title">Bitácora de auditoría — Qué usuario hizo cada acción</h2>
+    <span class="telemetry-chip">Total filtrado: {{ page.paginator.count }}</span>
+  </div>
+
+  <form method="get" class="filter-panel mb-sm">
+    <div class="filters">
+      <div>
+        <label for="a-user">Usuario</label>
+        <input id="a-user" name="usuario" value="{{ f.usuario }}" placeholder="Ej. admin, operador1" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div>
+        <label for="a-mod">Módulo</label>
+        <select id="a-mod" name="modulo">
+          <option value="">Todos los módulos</option>
+          {% for m in modulos %}
+            <option value="{{ m }}" {% if f.modulo == m %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="a-desde">Desde</label>
+        <input id="a-desde" type="date" name="desde" value="{{ f.desde|date:'Y-m-d'|default:f.desde }}">
+      </div>
+      <div>
+        <label for="a-hasta">Hasta</label>
+        <input id="a-hasta" type="date" name="hasta" value="{{ f.hasta|date:'Y-m-d'|default:f.hasta }}">
+      </div>
+      <div class="filter-actions" style="display:flex;gap:6px">
+        <button class="btn dark" type="submit">Filtrar</button>
+        <a class="btn sec" href="{% url 'adm_panel' %}">Limpiar</a>
+      </div>
+    </div>
+  </form>
+
+  <div class="table-wrapper" tabindex="0" role="region" aria-label="Registro de auditoría de acciones de usuario">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Fecha / Hora</th>
+          <th scope="col">Usuario</th>
+          <th scope="col">Perfil</th>
+          <th scope="col">Módulo</th>
+          <th scope="col">Acción ejecutada</th>
+          <th scope="col">Detalle</th>
+          <th scope="col">IP origen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in page %}
+        <tr>
+          <td class="mono">{{ a.fecha|date:"d/m/Y H:i:s" }}</td>
+          <td><strong>{{ a.usuario_nombre }}</strong></td>
+          <td class="mono">{{ a.rol_nombre|default:"—" }}</td>
+          <td><span class="tag info">{{ a.modulo }}</span></td>
+          <td><strong>{{ a.accion }}</strong></td>
+          <td>{{ a.detalle|default:"—" }}</td>
+          <td class="mono muted">{{ a.ip|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="muted" style="text-align:center;padding:18px">Sin acciones registradas con los filtros aplicados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pagination-bar">
+    <span>Página {{ page.number }} de {{ page.paginator.num_pages }} · {{ page.paginator.count }} eventos</span>
+    <div style="display:flex;gap:8px">
+      {% if page.has_previous %}
+        <a class="btn sec sm" href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page.previous_page_number }}">← Anterior</a>
+      {% endif %}
+      {% if page.has_next %}
+        <a class="btn sec sm" href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page.next_page_number }}">Siguiente →</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

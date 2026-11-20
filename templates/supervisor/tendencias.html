@@ -1,0 +1,142 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}Tendencias angulares{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-meta">
+    <span class="page-kicker">Aseguramiento de Calidad · Control Estadístico de Proceso</span>
+    <h1>Tendencia del ángulo</h1>
+    <div class="muted">Evolución temporal de lecturas angulares frente a bandas de tolerancia (máx. 500 disparos recientes)</div>
+  </div>
+  <div class="page-actions">
+    <a class="btn sec sm" href="{% url 'sup_dashboard' %}?{{ request.GET.urlencode }}">← Dashboard</a>
+  </div>
+</div>
+
+{% include "_filtros.html" %}
+
+<section class="grid g4" aria-label="Resumen estadístico de la serie">
+  <article class="kpi-tile">
+    <span class="kpi-lbl">Puntos graficados</span>
+    <div class="kpi">{{ stats_tend.n }}</div>
+    <div class="kpi-sub">Límite de ventana: 500</div>
+  </article>
+  <article class="kpi-tile">
+    <span class="kpi-lbl">Ángulo mínimo</span>
+    <div class="kpi">{% if stats_tend.min != None %}{{ stats_tend.min }}°{% else %}—{% endif %}</div>
+    <div class="kpi-sub">Extremo inferior medido</div>
+  </article>
+  <article class="kpi-tile">
+    <span class="kpi-lbl">Ángulo promedio</span>
+    <div class="kpi">{% if stats_tend.prom != None %}{{ stats_tend.prom }}°{% else %}—{% endif %}</div>
+    <div class="kpi-sub">Media aritmética del periodo</div>
+  </article>
+  <article class="kpi-tile">
+    <span class="kpi-lbl">Ángulo máximo / Rechazos</span>
+    <div class="kpi">{% if stats_tend.max != None %}{{ stats_tend.max }}°{% else %}—{% endif %}</div>
+    <div class="kpi-sub">Fuera de banda: {{ stats_tend.rechazos }}</div>
+  </article>
+</section>
+
+<section class="card">
+  <div class="card-header">
+    <h2>Carta de control angular (°)</h2>
+    <span class="mono muted">Haz clic sobre cualquier punto para abrir su expediente técnico</span>
+  </div>
+  {% if data.ids %}
+    <canvas id="ch" height="110" aria-label="Gráfico de tendencia angular" role="img"></canvas>
+  {% else %}
+    <div class="muted" style="padding:18px 0;text-align:center">No hay mediciones disponibles para graficar con los filtros seleccionados.</div>
+  {% endif %}
+</section>
+{{ data|json_script:"datos" }}
+{% endblock %}
+
+{% block js %}
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script>
+(function(){
+  const el = document.getElementById('ch');
+  const raw = document.getElementById('datos');
+  if (!el || !raw || !window.Chart) return;
+  const d = JSON.parse(raw.textContent);
+  if (!d.ids || !d.ids.length) return;
+
+  const ptColors = d.estado.map(function(e) {
+    return e === 'Aprobado' ? '#059669' : (e === 'Rechazado' ? '#c8102e' : '#2563eb');
+  });
+
+  new Chart(el, {
+    type: 'line',
+    data: {
+      labels: d.labels,
+      datasets: [
+        {
+          label: 'Ángulo medido (°)',
+          data: d.angulo,
+          borderColor: '#14181f',
+          backgroundColor: '#14181f',
+          borderWidth: 2,
+          tension: 0.15,
+          pointBackgroundColor: ptColors,
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 1.5,
+          pointRadius: 5,
+          pointHoverRadius: 7
+        },
+        {
+          label: 'Límite mín. (°)',
+          data: d.min,
+          borderColor: '#059669',
+          borderWidth: 1.5,
+          borderDash: [5, 4],
+          pointRadius: 0,
+          fill: false
+        },
+        {
+          label: 'Límite máx. (°)',
+          data: d.max,
+          borderColor: '#059669',
+          backgroundColor: 'rgba(16, 185, 129, 0.10)',
+          borderWidth: 1.5,
+          borderDash: [5, 4],
+          pointRadius: 0,
+          fill: '-1'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: { font: { family: 'monospace', size: 12 } }
+        },
+        tooltip: {
+          callbacks: {
+            afterLabel: function(ctx) {
+              if (ctx.datasetIndex !== 0) return '';
+              const idx = ctx.dataIndex;
+              const b = d.batches && d.batches[idx] ? `Batch: ${d.batches[idx]} · ` : '';
+              return `${b}Estado: ${d.estado[idx]}`;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          title: { display: true, text: 'Ángulo de salida (°)', font: { weight: 'bold' } },
+          grid: { color: '#e2e8f0' }
+        },
+        x: {
+          grid: { color: '#f1f5f9' }
+        }
+      },
+      onClick: function(_, els) {
+        if (els.length) location.href = `/inspeccion/${d.ids[els[0].index]}/`;
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,1 @@
+<span class="tag {% if estado == 'Aprobado' %}ok{% elif estado == 'Rechazado' %}bad{% else %}info{% endif %}">{% if estado == 'Aprobado' %}✓ {% elif estado == 'Rechazado' %}✕ {% else %}◌ {% endif %}{{ estado }}</span>

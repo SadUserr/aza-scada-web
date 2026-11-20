@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+db.sqlite3*
+.env
+.venv/
+logs/
+staticfiles/
+capturas/
+.demo_token*.txt
+*.docx
+*.bak

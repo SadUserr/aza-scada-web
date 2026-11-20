@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Historial de inspecciones{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-meta">
+    <span class="page-kicker">Operación de Planta · Registro Histórico</span>
+    <h1>Historial de inspecciones</h1>
+    <div class="muted">Consulta filtrable de mediciones angulares, turnos, operadores y veredictos de conformidad</div>
+  </div>
+  <div class="page-actions">
+    <span class="telemetry-chip">Total filtrado: {{ page.paginator.count }}</span>
+  </div>
+</div>
+
+{% include "_filtros.html" %}
+
+<section class="card">
+  <div class="table-wrapper" tabindex="0" role="region" aria-label="Tabla de historial de inspecciones">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Código</th>
+          <th scope="col">Fecha / Hora</th>
+          <th scope="col">Turno</th>
+          <th scope="col">Operador</th>
+          <th scope="col">Lote</th>
+          <th scope="col">Batch</th>
+          <th scope="col">Receta</th>
+          <th scope="col" style="text-align:end">Ángulo</th>
+          <th scope="col" style="text-align:end">Tolerancia</th>
+          <th scope="col">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in page %}
+        <tr>
+          <td class="mono"><a href="{% url 'detalle' r.pk %}">{{ r.codigo }}</a></td>
+          <td class="mono">{{ r.fecha|date:"d/m/Y H:i:s" }}</td>
+          <td>{{ r.turno.nombre|default:"—" }}</td>
+          <td>{{ r.operador.nombre_completo|default:"—" }}</td>
+          <td class="mono">{{ r.lote.codigo }}</td>
+          <td class="mono"><strong>{{ r.id_batch }}</strong></td>
+          <td>{% if r.receta %}[{{ r.receta.codigo_letra }}] {{ r.receta.nombre }}{% else %}—{% endif %}</td>
+          <td class="num">{{ r.angulo|floatformat:2 }}°</td>
+          <td class="num">{% if r.limite_min != None %}{{ r.limite_min }}° – {{ r.limite_max }}°{% else %}—{% endif %}</td>
+          <td>{% include "_estado.html" with estado=r.estado_nombre %}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10" class="muted" style="text-align:center;padding:20px">No se encontraron inspecciones con los filtros seleccionados.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pagination-bar">
+    <span>Página {{ page.number }} de {{ page.paginator.num_pages }} · {{ page.paginator.count }} registros</span>
+    <div style="display:flex;gap:8px">
+      {% if page.has_previous %}
+        <a class="btn sec sm" href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page.previous_page_number }}">← Anterior</a>
+      {% endif %}
+      {% if page.has_next %}
+        <a class="btn sec sm" href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page.next_page_number }}">Siguiente →</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}
