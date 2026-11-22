@@ -55,6 +55,13 @@
               {% else %}
                 <span class="mono muted">Finalizado</span>
               {% endif %}
+              {% if l.n_insp == 0 %}
+                ·
+                <form class="sec-form" method="post" action="{% url 'adm_lote_eliminar' l.pk %}" data-confirm-form data-confirm-label="el lote {{ l.codigo }}">
+                  {% csrf_token %}
+                  <button class="link" type="button" data-confirm-trigger>Eliminar</button>
+                </form>
+              {% endif %}
             </td>
           </tr>
           {% empty %}
@@ -96,6 +103,15 @@
   </form>
 </div>
 {{ sugerencias|json_script:"sug-codigos" }}
+
+<dialog id="confirm-del-lote" class="scada-dialog" aria-labelledby="confirm-lote-title">
+  <h2 id="confirm-lote-title">Confirmar eliminación de lote</h2>
+  <p id="confirm-lote-msg" class="muted">¿Eliminar definitivamente este lote sin inspecciones?</p>
+  <form method="dialog" class="dialog-actions">
+    <button type="submit" class="btn sec" value="cancel" autofocus>Cancelar</button>
+    <button type="submit" class="btn" value="confirm">Sí, eliminar</button>
+  </form>
+</dialog>
 {% endblock %}
 
 {% block js %}
@@ -125,6 +141,27 @@
   if (btnGen && sel && codInp) {
     btnGen.addEventListener('click', function() {
       if (S[sel.value]) codInp.value = S[sel.value];
+    });
+  }
+
+  const dlg = document.getElementById('confirm-del-lote');
+  const msg = document.getElementById('confirm-lote-msg');
+  let pendingForm = null;
+  if (dlg) {
+    document.querySelectorAll('[data-confirm-trigger]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        pendingForm = btn.closest('form');
+        if (msg && pendingForm) {
+          msg.textContent = '¿Eliminar definitivamente ' + (pendingForm.dataset.confirmLabel || 'este lote') + '? Esta acción no se puede deshacer.';
+        }
+        dlg.showModal();
+      });
+    });
+    dlg.addEventListener('close', function() {
+      const choice = dlg.returnValue;
+      dlg.returnValue = '';
+      if (choice === 'confirm' && pendingForm) pendingForm.submit();
+      pendingForm = null;
     });
   }
 })();

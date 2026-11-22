@@ -8,7 +8,8 @@
     <div class="muted">Indicadores consolidados de conformidad angular, rendimiento por turno y productividad por operador</div>
   </div>
   <div class="page-actions">
-    <a id="btn-exportar-csv" class="btn" href="{% url 'sup_exportar' %}?{{ request.GET.urlencode }}">⬇ Exportar reporte CSV</a>
+    <a class="btn" href="{% url 'sup_informe_gestion' %}?{{ request.GET.urlencode }}">Informe de gestión</a>
+    <a id="btn-exportar-csv" class="btn dark" href="{% url 'sup_exportar' %}?{{ request.GET.urlencode }}">⬇ Exportar CSV</a>
     <a class="btn sec" href="{% url 'sup_tendencias' %}?{{ request.GET.urlencode }}">Ver curva de tendencia →</a>
   </div>
 </div>

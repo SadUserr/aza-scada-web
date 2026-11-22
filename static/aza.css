@@ -1573,4 +1573,192 @@
       transition: none;
     }
   }
+
+  /* Diálogo modal nativo de confirmación (CRUD seguro) */
+  dialog.scada-dialog {
+    padding: 22px 24px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--ink);
+    max-inline-size: min(440px, 92vw);
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.28);
+  }
+
+  dialog.scada-dialog[open] {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  dialog.scada-dialog h2 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+
+  dialog.scada-dialog p {
+    margin: 0;
+    line-height: 1.45;
+  }
+
+  dialog.scada-dialog .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-block-start: 8px;
+  }
+
+  dialog:modal {
+    overscroll-behavior: contain;
+  }
+
+  dialog::backdrop {
+    background: rgba(15, 23, 42, 0.52);
+    overflow: hidden;
+    overscroll-behavior: contain;
+  }
+
+  /* Hoja de Informe Ejecutivo de Gestión */
+  .report-sheet {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    padding: 24px 26px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding-block-end: 16px;
+    border-block-end: 2px solid var(--aza-red);
+  }
+
+  .report-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .report-org {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--aza-red);
+  }
+
+  .report-title {
+    margin: 2px 0 0;
+    font-size: 1.25rem;
+    color: var(--ink);
+  }
+
+  .report-meta {
+    margin: 0;
+    font-size: 0.76rem;
+    color: var(--muted);
+    display: grid;
+    gap: 2px;
+  }
+
+  .report-meta > div {
+    display: flex;
+    gap: 6px;
+  }
+
+  .report-meta dt {
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .report-meta dd {
+    margin: 0;
+  }
+
+  .report-summary-box {
+    background: var(--surface-alt);
+    border: 1px solid var(--border-subtle);
+    border-inline-start: 4px solid var(--aza-red);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+  }
+
+  .report-summary-box h3,
+  .report-section h3 {
+    margin: 0 0 8px;
+    font-size: 0.92rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--ink);
+  }
+
+  .report-summary-box p {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .report-section {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    background: var(--surface);
+  }
+
+  .report-footer {
+    margin-block-start: 18px;
+    padding-block-start: 12px;
+    border-block-start: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 0.74rem;
+    color: var(--muted);
+  }
+
+  /* Estilo de impresión / Exportar PDF desde el navegador */
+  @media print {
+    body {
+      background: #ffffff;
+    }
+
+    .scada-rail,
+    .scada-topbar,
+    .rail-backdrop,
+    .no-print,
+    .msg {
+      display: none !important;
+    }
+
+    .scada-shell,
+    .scada-workspace,
+    .scada-canvas {
+      display: block !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      max-inline-size: 100% !important;
+    }
+
+    .report-sheet {
+      border: 0;
+      box-shadow: none;
+      padding: 0;
+    }
+
+    .table-wrapper {
+      overflow: visible !important;
+      max-block-size: none !important;
+    }
+
+    .report-section,
+    .report-summary-box,
+    .kpi-tile {
+      break-inside: avoid;
+    }
+  }
 }

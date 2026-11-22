@@ -1,0 +1,276 @@
+{% extends "base.html" %}{% load l10n %}
+{% block title %}Informe de gestión{% endblock %}
+{% block content %}
+<div class="page-head no-print">
+  <div class="page-head-meta">
+    <span class="page-kicker">Aseguramiento de Calidad · Reporte Ejecutivo</span>
+    <h1>Informe de gestión de calidad</h1>
+    <div class="muted">Generación y visualización consolidada de indicadores de planta, turnos, operadores, recetas y desviaciones críticas</div>
+  </div>
+  <div class="page-actions">
+    <button type="button" class="btn" id="btn-print-report">Imprimir / Guardar PDF</button>
+    {% if user.rol_nombre == 'Supervisor' %}
+      <a class="btn sec" href="{% url 'sup_exportar' %}?{{ request.GET.urlencode }}">⬇ Descargar CSV</a>
+      <a class="btn sec" href="{% url 'sup_dashboard' %}?{{ request.GET.urlencode }}">← Dashboard</a>
+    {% else %}
+      <a class="btn sec" href="{% url 'adm_panel' %}">← Panel y auditoría</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="no-print">
+  {% include "_filtros.html" %}
+</div>
+
+<article class="report-sheet" aria-label="Informe ejecutivo de gestión de calidad">
+  <header class="report-header">
+    <div class="report-brand">
+      <span class="logo">AZA</span>
+      <div>
+        <div class="report-org">ACEROS AZA S.A. · PLANTA RENCA · LÍNEA DE TREFILADO</div>
+        <h2 class="report-title">Informe de Gestión Operacional y Calidad Angular</h2>
+      </div>
+    </div>
+    <dl class="report-meta mono">
+      <div><dt>Emitido:</dt><dd>{{ emitido_en|date:"d/m/Y H:i:s" }}</dd></div>
+      <div><dt>Responsable:</dt><dd>{{ user.nombre_completo|default:user.username }} ({{ user.rol_nombre }})</dd></div>
+      <div>
+        <dt>Período:</dt>
+        <dd>
+          {% if f.desde %}{{ f.desde|date:"d/m/Y" }}{% else %}Inicio{% endif %}
+          —
+          {% if f.hasta %}{{ f.hasta|date:"d/m/Y" }}{% else %}Hoy{% endif %}
+          {% if f.lote %} · Lote: {{ f.lote }}{% endif %}
+        </dd>
+      </div>
+    </dl>
+  </header>
+
+  <section class="grid g4 mt-md" aria-label="Resumen ejecutivo de indicadores">
+    <div class="kpi-tile">
+      <div class="kpi-top"><span class="kpi-lbl">Rollos inspeccionados</span><span class="tag info">TOTAL</span></div>
+      <div class="kpi">{{ total }}</div>
+      <div class="kpi-sub">{{ lotes_periodo|length }} lote{{ lotes_periodo|length|pluralize }} con actividad</div>
+    </div>
+    <div class="kpi-tile">
+      <div class="kpi-top">
+        <span class="kpi-lbl">Conformidad global</span>
+        <span class="tag {% if tasa_ap >= 90 or not total %}ok{% elif tasa_ap >= 75 %}warn{% else %}bad{% endif %}">{{ tasa_ap }}%</span>
+      </div>
+      <div class="kpi" style="color:var(--ok-ink)">{{ aprobados }}</div>
+      <div class="kpi-sub">Aprobados · {{ rechazados }} rechazados ({{ tasa_re }}%)</div>
+    </div>
+    <div class="kpi-tile">
+      <div class="kpi-top"><span class="kpi-lbl">Ángulo promedio</span><span class="tag info">METROLOGÍA</span></div>
+      <div class="kpi">{% if ang_prom != None %}{{ ang_prom }}°{% else %}—{% endif %}</div>
+      <div class="kpi-sub">{% if ang_min != None %}Rango: {{ ang_min }}° a {{ ang_max }}°{% else %}Sin lecturas en el rango{% endif %}</div>
+    </div>
+    <div class="kpi-tile">
+      <div class="kpi-top">
+        <span class="kpi-lbl">Alarmas críticas</span>
+        <span class="tag {% if alarmas_criticas_total %}bad{% else %}ok{% endif %}">ALERTAS</span>
+      </div>
+      <div class="kpi" style="color:{% if alarmas_criticas_total %}var(--bad-ink){% else %}var(--ok-ink){% endif %}">{{ alarmas_criticas_total }}</div>
+      <div class="kpi-sub">Desviaciones fuera de tolerancia</div>
+    </div>
+  </section>
+
+  <section class="report-summary-box mt-md" aria-labelledby="resumen-auto-h">
+    <h3 id="resumen-auto-h">Síntesis ejecutiva del período</h3>
+    {% if total %}
+      <p>
+        Durante el período consultado se evaluaron <strong>{{ total }} rollos</strong> en la línea de trefilado,
+        alcanzando una tasa global de conformidad del <strong>{{ tasa_ap }}%</strong>
+        ({{ aprobados }} aprobados y {{ rechazados }} rechazados, con ángulo medio de salida de <strong>{{ ang_prom }}°</strong>).
+        {% if mejor_turno %}
+          El mejor desempeño por jornada correspondió al turno <strong>{{ mejor_turno.nombre }}</strong> ({{ mejor_turno.tasa }}% de conformidad sobre {{ mejor_turno.total }} rollos).
+        {% endif %}
+        {% if peor_turno and mejor_turno and peor_turno.nombre != mejor_turno.nombre %}
+          Se recomienda foco de ajuste preventivo en el turno <strong>{{ peor_turno.nombre }}</strong> ({{ peor_turno.tasa }}%, {{ peor_turno.rechazados }} rechazos).
+        {% endif %}
+        Se registraron <strong>{{ alarmas_criticas_total }} alarmas críticas</strong> de proceso.
+      </p>
+    {% else %}
+      <p class="muted">No se registran inspecciones dentro de los filtros seleccionados. Ajusta el rango de fechas o limpia los filtros para regenerar el informe.</p>
+    {% endif %}
+  </section>
+
+  <div class="grid g2 mt-md">
+    <section class="report-section">
+      <h3 id="rep-turnos-h">1. Desempeño comparativo de los 3 turnos</h3>
+      <div class="table-wrapper" tabindex="0" role="region" aria-labelledby="rep-turnos-h">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Turno</th>
+              <th scope="col" style="text-align:end">Total</th>
+              <th scope="col" style="text-align:end">Aprob.</th>
+              <th scope="col" style="text-align:end">Rech.</th>
+              <th scope="col" style="text-align:end">Áng. Prom.</th>
+              <th scope="col" style="text-align:end">Conformidad</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in rendimiento_turnos %}
+            <tr>
+              <td><strong>{{ t.nombre }}</strong> <span class="mono muted">({{ t.horario }})</span></td>
+              <td class="num">{{ t.total }}</td>
+              <td class="num" style="color:var(--ok-ink)">{{ t.aprobados }}</td>
+              <td class="num" style="color:var(--bad-ink)">{{ t.rechazados }}</td>
+              <td class="num">{% if t.prom != None %}{{ t.prom }}°{% else %}—{% endif %}</td>
+              <td class="num">
+                {% if t.total %}
+                  <span class="tag {% if t.tasa >= 90 %}ok{% elif t.tasa >= 75 %}warn{% else %}bad{% endif %}">{{ t.tasa }}%</span>
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="report-section">
+      <h3 id="rep-ops-h">2. Productividad y calidad por operador</h3>
+      <div class="table-wrapper" tabindex="0" role="region" aria-labelledby="rep-ops-h">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Operador</th>
+              <th scope="col" style="text-align:end">Rollos</th>
+              <th scope="col" style="text-align:end">Rech.</th>
+              <th scope="col" style="text-align:end">Lotes (Ini/Fin)</th>
+              <th scope="col" style="text-align:end">Conformidad</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for op in rendimiento_operadores %}
+            <tr>
+              <td><strong>{{ op.nombre }}</strong> <span class="mono muted">({{ op.username }})</span></td>
+              <td class="num">{{ op.total }}</td>
+              <td class="num" style="color:var(--bad-ink)">{{ op.rechazados }}</td>
+              <td class="num">{{ op.iniciados }} / {{ op.finalizados }}</td>
+              <td class="num">
+                {% if op.total %}
+                  <span class="tag {% if op.tasa >= 90 %}ok{% elif op.tasa >= 75 %}warn{% else %}bad{% endif %}">{{ op.tasa }}%</span>
+                {% else %}<span class="muted">Sin disparos</span>{% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="muted">Sin operadores registrados.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid g2 mt-md">
+    <section class="report-section">
+      <h3 id="rep-recetas-h">3. Conformidad por receta metalúrgica</h3>
+      <div class="table-wrapper" tabindex="0" role="region" aria-labelledby="rep-recetas-h">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Receta</th>
+              <th scope="col">Tolerancia</th>
+              <th scope="col" style="text-align:end">Eval.</th>
+              <th scope="col" style="text-align:end">Rech.</th>
+              <th scope="col" style="text-align:end">Conformidad</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in por_receta %}
+            <tr>
+              <td><span class="tag info">{{ r.letra }}</span> <strong>{{ r.nombre }}</strong></td>
+              <td class="mono">{% if r.min_tol != None %}{{ r.min_tol }}°–{{ r.max_tol }}°{% else %}—{% endif %}</td>
+              <td class="num">{{ r.total }}</td>
+              <td class="num" style="color:var(--bad-ink)">{{ r.rechazados }}</td>
+              <td class="num">
+                <span class="tag {% if r.tasa >= 90 %}ok{% elif r.tasa >= 75 %}warn{% else %}bad{% endif %}">{{ r.tasa }}%</span>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="muted">Sin inspecciones en el período.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="report-section">
+      <h3 id="rep-lotes-h">4. Lotes evaluados y trazabilidad de operadores</h3>
+      <div class="table-wrapper" tabindex="0" role="region" aria-labelledby="rep-lotes-h">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Lote</th>
+              <th scope="col">Receta</th>
+              <th scope="col">Op. Inicio / Fin</th>
+              <th scope="col" style="text-align:end">Eval. / Rech.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for l in lotes_periodo %}
+            <tr>
+              <td class="mono"><strong>{{ l.codigo }}</strong></td>
+              <td>[{{ l.receta.codigo_letra }}] {{ l.receta.nombre }}</td>
+              <td>
+                {{ l.operador_inicio.username|default:"—" }}
+                →
+                {% if l.abierto %}<span class="tag ok">En curso</span>{% else %}{{ l.operador_fin.username|default:"—" }}{% endif %}
+              </td>
+              <td class="num">{{ l.n_insp }} / <span style="color:var(--bad-ink)">{{ l.n_rech }}</span></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="muted">Sin lotes con actividad en el período.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <section class="report-section mt-md">
+    <h3 id="rep-alarmas-h">5. Detalle de alarmas críticas recientes (máx. 10)</h3>
+    <div class="table-wrapper" tabindex="0" role="region" aria-labelledby="rep-alarmas-h">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Fecha / Hora</th>
+            <th scope="col">Lote</th>
+            <th scope="col">Inspección</th>
+            <th scope="col">Descripción de la desviación</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in alarmas_criticas %}
+          <tr>
+            <td class="mono">{{ a.fecha|date:"d/m/Y H:i:s" }}</td>
+            <td class="mono">{{ a.lote.codigo|default:"—" }}</td>
+            <td class="mono">{% if a.registro %}<strong>{{ a.registro.codigo }}</strong>{% else %}—{% endif %}</td>
+            <td>{{ a.descripcion }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="muted">Sin alarmas críticas registradas en el período filtrado.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="report-footer">
+    <span>Documento generado automáticamente por el Sistema Web de Trazabilidad Aceros AZA · Planta Renca</span>
+    <span class="mono">{{ emitido_en|date:"Y-m-d H:i" }} · {{ user.username }}</span>
+  </footer>
+</article>
+{% endblock %}
+
+{% block js %}
+<script>
+(function(){
+  const btn = document.getElementById('btn-print-report');
+  if (btn) btn.addEventListener('click', function() { window.print(); });
+})();
+</script>
+{% endblock %}

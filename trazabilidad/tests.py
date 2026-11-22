@@ -389,6 +389,49 @@ class PruebasIntegracion(Base):
     def test_PI39_operador_no_accede_panel_auditoria(self):
         self.assertEqual(login("op").get("/administracion/panel/").status_code, 403)
 
+    def test_PI40_crud_eliminacion_segura_receta_y_lote(self):
+        # Operador recibe 403 al intentar eliminar
+        self.assertEqual(login("op").post(f"/administracion/recetas/{self.receta.pk}/eliminar/").status_code, 403)
+        self.assertEqual(login("op").post(f"/administracion/lotes/{self.lote.pk}/eliminar/").status_code, 403)
+
+        adm = login("adm")
+        # Receta sin lotes se elimina físicamente y deja auditoría
+        r_tmp = Receta.objects.create(codigo_letra="Z", nombre="TF-TEMP", espesor_mm=8, material="SAE 1008", min_tol=10, max_tol=11)
+        resp = adm.post(f"/administracion/recetas/{r_tmp.pk}/eliminar/", follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Receta.objects.filter(pk=r_tmp.pk).exists())
+        self.assertTrue(RegistroAuditoria.objects.filter(modulo="Recetas", accion="Eliminación de receta").exists())
+
+        # Lote sin inspecciones se elimina físicamente
+        l_tmp = Lote.objects.create(codigo="A-20261121-99", receta=self.receta)
+        resp = adm.post(f"/administracion/lotes/{l_tmp.pk}/eliminar/", follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Lote.objects.filter(pk=l_tmp.pk).exists())
+        self.assertTrue(RegistroAuditoria.objects.filter(modulo="Lotes", accion="Eliminación de lote").exists())
+
+        # Receta con lote y lote con inspección quedan protegidos (PROTECT)
+        mk_registro(self.lote, "B-PROT", 12.5)
+        adm.post(f"/administracion/recetas/{self.receta.pk}/eliminar/")
+        adm.post(f"/administracion/lotes/{self.lote.pk}/eliminar/")
+        self.assertTrue(Receta.objects.filter(pk=self.receta.pk).exists())
+        self.assertTrue(Lote.objects.filter(pk=self.lote.pk).exists())
+
+    def test_PI41_informe_de_gestion_supervisor_y_admin(self):
+        self.api({"lote": "L1", "id_batch": "B-INF1", "angulo": 12.5})
+        self.api({"lote": "L1", "id_batch": "B-INF2", "angulo": 14.2})
+        # Operador no puede acceder al informe de gestión
+        self.assertEqual(login("op").get("/supervisor/informe/").status_code, 403)
+        # Supervisor y Administrador acceden y generan el informe con indicadores reales
+        for u in ("sup", "adm"):
+            r = login(u).get("/supervisor/informe/")
+            self.assertEqual(r.status_code, 200)
+            self.assertContains(r, "Informe de Gestión Operacional y Calidad Angular")
+            self.assertEqual(r.context["total"], 2)
+            self.assertEqual(r.context["aprobados"], 1)
+            self.assertEqual(r.context["rechazados"], 1)
+            self.assertEqual(len(r.context["rendimiento_turnos"]), 3)
+        self.assertTrue(RegistroAuditoria.objects.filter(modulo="Supervisión", accion="Generación de informe de gestión").exists())
+
 
 class PruebasSeguridad(Base):
     def test_PS01_inyeccion_sql_en_filtro(self):

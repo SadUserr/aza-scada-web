@@ -3,7 +3,7 @@ import logging
 import secrets
 from datetime import timedelta
 from django.contrib import messages
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, Max, Min, ProtectedError, Q
 from django.core.paginator import Paginator
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -350,6 +350,110 @@ def _celda(v):
     return "'" + s if s[:1] in "=+-@" else s                             # evita inyección de fórmulas en Excel
 
 
+@rol_requerido(SUP, ADM)
+def sup_informe_gestion(request):                                        # Informe ejecutivo de gestión (visualización + impresión/PDF)
+    qs, error, f = _filtrar(
+        request,
+        RegistroInspeccion.objects.select_related("lote", "receta", "estado", "turno", "operador"),
+        defecto_dias=7,
+    )
+    if error:
+        messages.error(request, error)
+    tot = qs.count()
+    ap = qs.filter(estado__nombre=RegistroInspeccion.APROBADO).count()
+    re_ = qs.filter(estado__nombre=RegistroInspeccion.RECHAZADO).count()
+    tasa_ap = round(ap * 100 / tot, 1) if tot else 0
+    tasa_re = round(re_ * 100 / tot, 1) if tot else 0
+    ang = qs.aggregate(prom=Avg("angulo"), minimo=Min("angulo"), maximo=Max("angulo"))
+    turnos = _rendimiento_turnos(qs)
+    operadores = _rendimiento_operadores(qs)
+
+    # Desglose de conformidad por receta
+    rec_rows = (
+        qs.values("receta__codigo_letra", "receta__nombre", "receta__min_tol", "receta__max_tol")
+        .annotate(
+            total=Count("id"),
+            aprobados=Count("id", filter=Q(estado__nombre=RegistroInspeccion.APROBADO)),
+            rechazados=Count("id", filter=Q(estado__nombre=RegistroInspeccion.RECHAZADO)),
+            prom=Avg("angulo"),
+        )
+        .order_by("-total")
+    )
+    por_receta = []
+    for r in rec_rows:
+        rt = r["total"]
+        por_receta.append({
+            "letra": r["receta__codigo_letra"] or "—",
+            "nombre": r["receta__nombre"] or "Sin receta",
+            "min_tol": r["receta__min_tol"],
+            "max_tol": r["receta__max_tol"],
+            "total": rt,
+            "aprobados": r["aprobados"],
+            "rechazados": r["rechazados"],
+            "prom": round(r["prom"], 2) if r["prom"] is not None else None,
+            "tasa": round(r["aprobados"] * 100 / rt, 1) if rt else 0,
+        })
+
+    # Lotes involucrados en el período
+    lote_ids = list(qs.values_list("lote_id", flat=True).distinct())
+    lotes_periodo = (
+        Lote.objects.filter(pk__in=lote_ids)
+        .select_related("receta", "operador_inicio", "operador_activo", "operador_fin")
+        .annotate(
+            n_insp=Count("inspecciones", filter=Q(inspecciones__in=qs)),
+            n_rech=Count("inspecciones", filter=Q(inspecciones__in=qs, inspecciones__estado__nombre=RegistroInspeccion.RECHAZADO)),
+        )
+        .order_by("-fecha_inicio")
+    )
+
+    alarmas_qs = Alarma.de_proceso().filter(nivel=Alarma.CRITICA).select_related("lote", "registro")
+    if f["desde"]:
+        alarmas_qs = alarmas_qs.filter(fecha__date__gte=f["desde"])
+    if f["hasta"]:
+        alarmas_qs = alarmas_qs.filter(fecha__date__lte=f["hasta"])
+    if f["lote"]:
+        alarmas_qs = alarmas_qs.filter(lote__codigo__icontains=f["lote"])
+    alarmas_criticas_total = alarmas_qs.count()
+    alarmas_criticas = list(alarmas_qs[:10])
+
+    # Conclusión ejecutiva automática basada en los indicadores del período
+    turnos_con_datos = [t for t in turnos if t["total"] > 0]
+    mejor_turno = max(turnos_con_datos, key=lambda t: t["tasa"]) if turnos_con_datos else None
+    peor_turno = min(turnos_con_datos, key=lambda t: t["tasa"]) if turnos_con_datos else None
+
+    registrar_auditoria(
+        "Supervisión",
+        "Generación de informe de gestión",
+        f"Emitió informe ejecutivo en pantalla ({tot} inspecciones, conformidad {tasa_ap}%)",
+        request=request,
+    )
+
+    return render(request, "supervisor/informe.html", {
+        "emitido_en": timezone.localtime(),
+        "total": tot,
+        "aprobados": ap,
+        "rechazados": re_,
+        "tasa_ap": tasa_ap,
+        "tasa_re": tasa_re,
+        "ang_prom": round(ang["prom"], 2) if ang["prom"] is not None else None,
+        "ang_min": round(ang["minimo"], 2) if ang["minimo"] is not None else None,
+        "ang_max": round(ang["maximo"], 2) if ang["maximo"] is not None else None,
+        "rendimiento_turnos": turnos,
+        "rendimiento_operadores": operadores,
+        "por_receta": por_receta,
+        "lotes_periodo": lotes_periodo,
+        "alarmas_criticas_total": alarmas_criticas_total,
+        "alarmas_criticas": alarmas_criticas,
+        "mejor_turno": mejor_turno,
+        "peor_turno": peor_turno,
+        "f": f,
+        "recetas": Receta.objects.all(),
+        "estados": _estados(),
+        "turnos": Turno.objects.all(),
+        "operadores": Usuario.objects.filter(rol__nombre=OP).order_by("username"),
+    })
+
+
 @rol_requerido(SUP)
 def sup_exportar(request):                                               # CU09
     qs, error, _ = _filtrar(request, RegistroInspeccion.objects.select_related("lote", "receta", "estado", "turno", "operador"))
@@ -505,13 +609,31 @@ def adm_recetas(request, pk=None):                                       # CU11
 
 @rol_requerido(ADM)
 @require_POST
-def adm_receta_toggle(request, pk):                                      # A2: solo desactivar, nunca eliminar
+def adm_receta_toggle(request, pk):                                      # Desactivación lógica para recetas con historial
     r = get_object_or_404(Receta, pk=pk)
     r.activo = not r.activo
     r.save(update_fields=["activo"])
     log.info("admin %s %s la receta %s", request.user.username, "activó" if r.activo else "desactivó", r.nombre)
     registrar_auditoria("Recetas", f"Receta {'activada' if r.activo else 'desactivada'}",
                         f"[{r.codigo_letra}] {r.nombre}", request=request)
+    return redirect("adm_recetas")
+
+
+@rol_requerido(ADM)
+@require_POST
+def adm_receta_eliminar(request, pk):                                    # Eliminación segura (solo sin historial, respeta PROTECT)
+    r = get_object_or_404(Receta, pk=pk)
+    etiqueta = f"[{r.codigo_letra}] {r.nombre}"
+    try:
+        r.delete()
+    except ProtectedError:
+        messages.error(request, f"No se puede eliminar la receta {etiqueta} porque tiene lotes o inspecciones asociadas. Usa Desactivar.")
+        registrar_auditoria("Recetas", "Eliminación bloqueada por integridad",
+                            f"Intento de eliminar receta {etiqueta} con registros asociados", request=request)
+    else:
+        log.info("admin %s eliminó la receta %s", request.user.username, etiqueta)
+        registrar_auditoria("Recetas", "Eliminación de receta", f"Eliminó receta sin historial {etiqueta}", request=request)
+        messages.success(request, f"Receta {etiqueta} eliminada correctamente.")
     return redirect("adm_recetas")
 
 
@@ -530,7 +652,8 @@ def adm_lotes(request):                                                  # CU12
     sugerencias = {str(r.pk): Lote.generar_codigo(r) for r in recetas_activas}
     return render(request, "admin/lotes.html", {
         "form": form,
-        "lotes": Lote.objects.select_related("receta", "operador_inicio", "operador_activo", "operador_fin").order_by("-fecha_inicio"),
+        "lotes": Lote.objects.select_related("receta", "operador_inicio", "operador_activo", "operador_fin")
+                     .annotate(n_insp=Count("inspecciones")).order_by("-fecha_inicio"),
         "recetas": recetas_activas,
         "sugerencias": sugerencias})
 
@@ -550,6 +673,24 @@ def adm_lote_cerrar(request, pk):
         registrar_auditoria("Lotes", "Cierre administrativo de lote",
                             f"Cerró lote {l.codigo} (op. fin: {l.operador_fin.username if l.operador_fin else '—'})",
                             request=request)
+    return redirect("adm_lotes")
+
+
+@rol_requerido(ADM)
+@require_POST
+def adm_lote_eliminar(request, pk):                                      # Eliminación segura (solo sin inspecciones, respeta PROTECT)
+    l = get_object_or_404(Lote, pk=pk)
+    codigo = l.codigo
+    try:
+        l.delete()
+    except ProtectedError:
+        messages.error(request, f"No se puede eliminar el lote {codigo} porque tiene inspecciones o alarmas registradas. Usa Cerrar lote.")
+        registrar_auditoria("Lotes", "Eliminación bloqueada por integridad",
+                            f"Intento de eliminar lote {codigo} con registros asociados", request=request)
+    else:
+        log.info("admin %s eliminó el lote %s", request.user.username, codigo)
+        registrar_auditoria("Lotes", "Eliminación de lote", f"Eliminó lote sin inspecciones {codigo}", request=request)
+        messages.success(request, f"Lote {codigo} eliminado correctamente.")
     return redirect("adm_lotes")
 
 

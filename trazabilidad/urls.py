@@ -12,6 +12,7 @@ urlpatterns = [
     path("inspeccion/<int:pk>/", v.detalle, name="detalle"),
     # Supervisor
     path("supervisor/", v.sup_dashboard, name="sup_dashboard"),
+    path("supervisor/informe/", v.sup_informe_gestion, name="sup_informe_gestion"),
     path("supervisor/tendencias/", v.sup_tendencias, name="sup_tendencias"),
     path("supervisor/lote/", v.sup_lote, name="sup_lote"),
     path("supervisor/exportar/", v.sup_exportar, name="sup_exportar"),
@@ -22,8 +23,10 @@ urlpatterns = [
     path("administracion/recetas/", v.adm_recetas, name="adm_recetas"),
     path("administracion/recetas/<int:pk>/", v.adm_recetas, name="adm_receta_editar"),
     path("administracion/recetas/<int:pk>/toggle/", v.adm_receta_toggle, name="adm_receta_toggle"),
+    path("administracion/recetas/<int:pk>/eliminar/", v.adm_receta_eliminar, name="adm_receta_eliminar"),
     path("administracion/lotes/", v.adm_lotes, name="adm_lotes"),
     path("administracion/lotes/<int:pk>/cerrar/", v.adm_lote_cerrar, name="adm_lote_cerrar"),
+    path("administracion/lotes/<int:pk>/eliminar/", v.adm_lote_eliminar, name="adm_lote_eliminar"),
     path("administracion/tokens/", v.adm_tokens, name="adm_tokens"),
     path("administracion/tokens/<int:pk>/revocar/", v.adm_token_revocar, name="adm_token_revocar"),
 ]
