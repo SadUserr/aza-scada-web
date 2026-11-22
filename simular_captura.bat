@@ -3,6 +3,7 @@ setlocal EnableExtensions
 chcp 65001 >nul
 set "PYTHONUTF8=1"
 set "PYTHONIOENCODING=utf-8"
+set "DJANGO_DEBUG=1"
 title AZA SCADA - Emulador de Nodo Optico (Jetson / Camara)
 cd /d "%~dp0"
 

@@ -17,6 +17,7 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U aza" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
+      DJANGO_DEBUG: "1"
       DB_NAME: aza
       DB_USER: aza
       DB_PASSWORD: aza
@@ -34,8 +35,10 @@ jobs:
         run: |
           python manage.py check
           python manage.py makemigrations --check --dry-run
-      - name: Pruebas unitarias, de integración, seguridad y E2E
-        run: python manage.py test -v 2
+      - name: Pruebas unitarias, de integración, seguridad y E2E con cobertura
+        run: |
+          coverage run --source=aza,cuentas,trazabilidad manage.py test -v 2
+          coverage report --omit="*/migrations/*,*/tests.py"
       - name: Análisis estático de seguridad (Bandit)
         run: bandit -r aza cuentas trazabilidad -x "*/tests.py,*/migrations/*" -ll
       - name: Vulnerabilidades en dependencias (pip-audit)

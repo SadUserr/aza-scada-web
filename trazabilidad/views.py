@@ -7,6 +7,7 @@ from django.db.models import Avg, Count, Max, Min, ProtectedError, Q
 from django.core.paginator import Paginator
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
@@ -236,6 +237,21 @@ def op_alarmas(request):                                                 # CU05
     }
     qs = base_qs.filter(nivel=nivel) if nivel in (Alarma.CRITICA, Alarma.INFORMATIVA) else base_qs
     return render(request, "operador/alarmas.html", {"alarmas": qs[:100], "nivel": nivel, "counts": counts})
+
+
+@rol_requerido(OP)
+@require_POST
+def op_alarma_atender(request, pk):
+    a = get_object_or_404(Alarma.de_proceso(), pk=pk)
+    if not a.atendida:
+        a.atendida = True
+        a.save(update_fields=["atendida"])
+        registrar_auditoria("Alarmas", "Reconocimiento de alarma", f"Marcó como atendida la alarma #{a.pk} ({a.tipo})", request=request)
+        messages.success(request, "Alarma marcada como atendida.")
+    nivel = request.POST.get("nivel")
+    if nivel in (Alarma.CRITICA, Alarma.INFORMATIVA):
+        return redirect(f"{reverse('op_alarmas')}?nivel={nivel}")
+    return redirect("op_alarmas")
 
 
 @rol_requerido(OP, SUP)

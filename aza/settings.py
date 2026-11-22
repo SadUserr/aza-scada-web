@@ -1,12 +1,14 @@
 """Configuración del Sistema Web de Monitoreo y Trazabilidad del Trefilado (AZA)."""
 import os
+import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
+_TESTING = "test" in sys.argv
+DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
 
 # Secretos solo por variables de entorno (informe 7.3). En desarrollo se usa una clave local.
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY") or ("dev-insegura-no-usar-en-produccion" if DEBUG else None)
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY") or ("dev-insegura-no-usar-en-produccion" if (DEBUG or _TESTING) else None)
 if not SECRET_KEY:
     raise RuntimeError("Define DJANGO_SECRET_KEY cuando DJANGO_DEBUG=0")
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
@@ -35,7 +37,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
-if not DEBUG:                                           # sirve /static en el despliegue (Render)
+if not DEBUG and not _TESTING:                        # sirve /static en el despliegue (Render)
     try:
         import whitenoise  # noqa: F401
         MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
@@ -127,7 +129,7 @@ LOGGING = {
     },
 }
 
-if not DEBUG:
+if not DEBUG and not _TESTING:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True

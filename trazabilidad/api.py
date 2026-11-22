@@ -9,7 +9,10 @@ from .services import ingestar
 
 
 def _ip(request):
-    return request.META.get("REMOTE_ADDR", "?")
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if xff:
+        return xff.split(",")[0].strip()[:45] or "?"
+    return str(request.META.get("REMOTE_ADDR", "?"))[:45]
 
 
 @csrf_exempt

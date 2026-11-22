@@ -432,6 +432,29 @@ class PruebasIntegracion(Base):
             self.assertEqual(len(r.context["rendimiento_turnos"]), 3)
         self.assertTrue(RegistroAuditoria.objects.filter(modulo="Supervisión", accion="Generación de informe de gestión").exists())
 
+    def test_PI42_filtro_con_obs_y_reconocimiento_alarma(self):
+        r1 = mk_registro(self.lote, "B-OBS1", 12.5)
+        mk_registro(self.lote, "B-OBS2", 12.6)
+        op_user = Usuario.objects.get(username="op")
+        Observacion.objects.create(registro=r1, usuario=op_user, tipo="nota", descripcion="Desgaste leve en hilera.")
+        c_op = login("op")
+        resp = c_op.get("/operador/historial/", {"con_obs": "1"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'name="con_obs"')
+        self.assertEqual(resp.context["page"].paginator.count, 1)
+        self.assertEqual(resp.context["page"].object_list[0].pk, r1.pk)
+
+        # Alarma crítica de proceso + reconocimiento solo por Operador
+        self.api({"lote": "L1", "id_batch": "B-ALM", "angulo": 14.5})
+        alarma = Alarma.de_proceso().get(nivel=Alarma.CRITICA)
+        self.assertFalse(alarma.atendida)
+        self.assertEqual(login("sup").post(f"/operador/alarmas/{alarma.pk}/atender/").status_code, 403)
+        r_at = c_op.post(f"/operador/alarmas/{alarma.pk}/atender/", follow=True)
+        self.assertEqual(r_at.status_code, 200)
+        alarma.refresh_from_db()
+        self.assertTrue(alarma.atendida)
+        self.assertTrue(RegistroAuditoria.objects.filter(modulo="Alarmas", accion="Reconocimiento de alarma").exists())
+
 
 class PruebasSeguridad(Base):
     def test_PS01_inyeccion_sql_en_filtro(self):
@@ -496,6 +519,23 @@ class PruebasSeguridad(Base):
         with self.settings(API_LIMITE_POR_MINUTO=3):
             codigos = [self.api({"lote": "L1", "id_batch": f"B{i}", "angulo": 12}).status_code for i in range(4)]
         self.assertEqual(codigos[-1], 429)
+
+    def test_PS12_rate_limit_usa_x_forwarded_for(self):
+        cache.clear()
+        with self.settings(API_LIMITE_POR_MINUTO=2):
+            c1 = Client()
+            r = lambda ip, b: c1.post(
+                "/api/inspecciones",
+                json.dumps({"lote": "L1", "id_batch": b, "angulo": 12.5}),
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f"Bearer {self.tok}",
+                HTTP_X_FORWARDED_FOR=f"{ip}, 10.0.0.1",
+            )
+            self.assertEqual(r("203.0.113.10", "BX1").status_code, 201)
+            self.assertEqual(r("203.0.113.10", "BX2").status_code, 201)
+            self.assertEqual(r("203.0.113.10", "BX3").status_code, 429)
+            # Otra IP detrás del mismo proxy mantiene su propio contador
+            self.assertEqual(r("203.0.113.11", "BX4").status_code, 201)
 
 
 # ============================================================ Funcionales sin navegador (Tabla 44)

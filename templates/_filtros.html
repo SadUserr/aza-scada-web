@@ -61,6 +61,12 @@
       </select>
     </div>
     {% endif %}
+    <div style="display:flex;align-items:flex-end;padding-bottom:6px">
+      <label for="f-con-obs" style="display:inline-flex;align-items:center;gap:6px;margin:0;cursor:pointer;font-weight:600">
+        <input id="f-con-obs" type="checkbox" name="con_obs" value="1" {% if f.con_obs == '1' %}checked{% endif %} style="inline-size:auto">
+        Solo con observaciones
+      </label>
+    </div>
     <div class="filter-actions">
       <button class="btn dark" type="submit">Filtrar</button>
     </div>

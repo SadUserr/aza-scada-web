@@ -9,6 +9,7 @@ urlpatterns = [
     path("operador/ultima.json", v.op_ultima_json, name="op_ultima_json"),
     path("operador/historial/", v.op_historial, name="op_historial"),
     path("operador/alarmas/", v.op_alarmas, name="op_alarmas"),
+    path("operador/alarmas/<int:pk>/atender/", v.op_alarma_atender, name="op_alarma_atender"),
     path("inspeccion/<int:pk>/", v.detalle, name="detalle"),
     # Supervisor
     path("supervisor/", v.sup_dashboard, name="sup_dashboard"),
