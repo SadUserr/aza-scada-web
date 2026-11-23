@@ -109,6 +109,7 @@ MINUTOS_BLOQUEO = 15
 LARGO_MIN_PASSWORD = 12
 API_LIMITE_POR_MINUTO = int(os.getenv("API_LIMITE_POR_MINUTO", "120"))   # límite por IP a la API (7.2)
 API_MAX_BYTES = 10_000
+TRUSTED_PROXY_HOPS = int(os.getenv("TRUSTED_PROXY_HOPS", "1" if _render_host else "0"))
 
 # Registro de eventos de seguridad (7.2, OWASP A09): logins, bloqueos, tokens inválidos y acciones
 # del Administrador. Nunca se registran contraseñas ni tokens en claro.

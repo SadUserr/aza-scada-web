@@ -521,21 +521,29 @@ class PruebasSeguridad(Base):
         self.assertEqual(codigos[-1], 429)
 
     def test_PS12_rate_limit_usa_x_forwarded_for(self):
+        c1 = Client()
+        post_xff = lambda xff, b: c1.post(
+            "/api/inspecciones",
+            json.dumps({"lote": "L1", "id_batch": b, "angulo": 12.5}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {self.tok}",
+            HTTP_X_FORWARDED_FOR=xff,
+        )
+        # 1) Sin proxy confiable (TRUSTED_PROXY_HOPS=0): rotar X-Forwarded-For NO evade el límite 429
         cache.clear()
-        with self.settings(API_LIMITE_POR_MINUTO=2):
-            c1 = Client()
-            r = lambda ip, b: c1.post(
-                "/api/inspecciones",
-                json.dumps({"lote": "L1", "id_batch": b, "angulo": 12.5}),
-                content_type="application/json",
-                HTTP_AUTHORIZATION=f"Bearer {self.tok}",
-                HTTP_X_FORWARDED_FOR=f"{ip}, 10.0.0.1",
-            )
-            self.assertEqual(r("203.0.113.10", "BX1").status_code, 201)
-            self.assertEqual(r("203.0.113.10", "BX2").status_code, 201)
-            self.assertEqual(r("203.0.113.10", "BX3").status_code, 429)
-            # Otra IP detrás del mismo proxy mantiene su propio contador
-            self.assertEqual(r("203.0.113.11", "BX4").status_code, 201)
+        with self.settings(API_LIMITE_POR_MINUTO=2, TRUSTED_PROXY_HOPS=0):
+            self.assertEqual(post_xff("198.51.100.1", "BZ1").status_code, 201)
+            self.assertEqual(post_xff("198.51.100.2", "BZ2").status_code, 201)
+            self.assertEqual(post_xff("198.51.100.3", "BZ3").status_code, 429)
+
+        # 2) Tras 1 proxy confiable (TRUSTED_PROXY_HOPS=1, ej. Render): toma parts[-1] (IP real agregada por el proxy)
+        # Un atacante que cambia el valor izquierdo sigue bloqueado (429), pero otro cliente real sí pasa (201)
+        cache.clear()
+        with self.settings(API_LIMITE_POR_MINUTO=2, TRUSTED_PROXY_HOPS=1):
+            self.assertEqual(post_xff("198.51.100.1, 203.0.113.10", "BX1").status_code, 201)
+            self.assertEqual(post_xff("198.51.100.2, 203.0.113.10", "BX2").status_code, 201)
+            self.assertEqual(post_xff("198.51.100.3, 203.0.113.10", "BX3").status_code, 429)
+            self.assertEqual(post_xff("198.51.100.1, 203.0.113.11", "BX4").status_code, 201)
 
 
 # ============================================================ Funcionales sin navegador (Tabla 44)

@@ -2,13 +2,25 @@
 from typing import Optional
 
 
-def _client_ip(request) -> str:
+def client_ip(request) -> str:
+    """Devuelve la IP del cliente resistente a suplantación de X-Forwarded-For.
+
+    - TRUSTED_PROXY_HOPS == 0: ignora X-Forwarded-For y usa REMOTE_ADDR.
+    - TRUSTED_PROXY_HOPS >= 1: toma parts[-hops] desde la derecha (valor agregado por el proxy confiable).
+    """
     if request is None:
         return ""
-    xff = request.META.get("HTTP_X_FORWARDED_FOR")
-    if xff:
-        return xff.split(",")[0].strip()[:45]
+    from django.conf import settings
+    hops = int(getattr(settings, "TRUSTED_PROXY_HOPS", 0) or 0)
+    if hops > 0:
+        xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+        parts = [p.strip() for p in xff.split(",") if p.strip()]
+        if len(parts) >= hops:
+            return parts[-hops][:45]
     return str(request.META.get("REMOTE_ADDR", ""))[:45]
+
+
+_client_ip = client_ip
 
 
 def registrar_auditoria(
